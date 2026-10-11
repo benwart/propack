@@ -3,7 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(AppModel.self) private var model
     @AppStorage("proPresenterPort") private var port: Int = 0
-    @State private var showConnectionSheet = false
+    private var showConnectionSheetState = State(initialValue: false)
 
     var body: some View {
         NavigationSplitView {
@@ -23,19 +23,19 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItem(placement: .navigation) {
-                Button { showConnectionSheet = true } label: {
+                Button { showConnectionSheetState.wrappedValue = true } label: {
                     ConnectionBadge(state: model.connection, port: model.connectedPort)
                 }
                 .help("Connection settings")
             }
         }
-        .sheet(isPresented: $showConnectionSheet) {
+        .sheet(isPresented: showConnectionSheetState.projectedValue) {
             VStack(spacing: 0) {
                 ScrollView { ConnectionSetupView(port: $port).padding(24) }
                 Divider()
                 HStack {
                     Spacer()
-                    Button("Done") { showConnectionSheet = false }.keyboardShortcut(.defaultAction)
+                    Button("Done") { showConnectionSheetState.wrappedValue = false }.keyboardShortcut(.defaultAction)
                 }
                 .padding()
             }
@@ -183,8 +183,7 @@ struct PlaylistSidebar: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        @Bindable var model = model
-        List(selection: $model.selectedPlaylistID) {
+        List(selection: Binding(get: { model.selectedPlaylistID }, set: { model.selectedPlaylistID = $0 })) {
             if let error = model.playlistsError {
                 Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red)
             }
@@ -431,8 +430,12 @@ struct ExportBar: View {
     }
 }
 
-#Preview {
-    ContentView()
-        .environment(AppModel())
-        .frame(width: 960, height: 620)
+#if DEBUG
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView()
+            .environment(AppModel())
+            .frame(width: 960, height: 620)
+    }
 }
+#endif

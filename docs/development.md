@@ -7,6 +7,16 @@
 - Xcode 15 or 16+
 - Swift 6.0+
 
+### Automated CLI Build (`make`)
+You can build the full installable `.app` bundle from the terminal without launching Xcode:
+```bash
+# Compile, assemble, and sign ProPack.app into dist/
+make app
+
+# Or install it directly into /Applications:
+make install
+```
+
 ### Compiling with Xcode
 1. Open `ProPack.xcodeproj` in Xcode:
    ```bash

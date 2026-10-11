@@ -64,9 +64,26 @@ propack/
 
 ### Requirements
 - macOS 14.0 or newer
-- Xcode 15 or 16+ with Swift 6 support
+- Swift 6.0+ (Xcode Command Line Tools or full Xcode)
 
-### In Xcode
+### Automated Build via Terminal (No Xcode Required)
+You can build the complete `.app` bundle from the terminal using `make`:
+
+```bash
+# Build standalone ProPack.app bundle in dist/
+make app
+
+# Build and launch immediately
+make run
+
+# Build and install directly to /Applications
+make install
+
+# (Optional) Build and sign with your Developer ID certificate
+make app SIGNING_IDENTITY="Developer ID Application: Your Name (TEAM_ID)"
+```
+
+### In Xcode (Optional GUI)
 1. Open `ProPack.xcodeproj` in Xcode.
 2. Select the **ProPack** scheme and target **My Mac**.
 3. Press `Cmd + R` to build and run.
