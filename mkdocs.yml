@@ -65,4 +65,5 @@ nav:
       - Library Discovery: specs/library-discovery.md
       - Export & Packaging: specs/export-packaging.md
       - REST API Reference: specs/api-reference.md
+      - Building & Code Signing: specs/distribution-signing.md
   - Development & Contributing: development.md

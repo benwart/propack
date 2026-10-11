@@ -63,3 +63,4 @@ fastlane/test_output
 
 # MkDocs
 site/
+dist/
