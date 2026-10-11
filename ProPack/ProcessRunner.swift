@@ -57,4 +57,20 @@ enum ProcessRunner {
             }
         }
     }
+
+    static func runSync(_ executable: String, arguments: [String]) throws -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.standardInput = FileHandle.nullDevice
+
+        let outPipe = Pipe()
+        process.standardOutput = outPipe
+        process.standardError = FileHandle.nullDevice
+
+        try process.run()
+        let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return String(decoding: data, as: UTF8.self)
+    }
 }

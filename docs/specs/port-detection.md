@@ -33,30 +33,25 @@ sequenceDiagram
 
 ---
 
-## 1. Process Discovery (`NSWorkspace`)
+## 1. Process Discovery & Helper Daemon Inspection
 
-Rather than invoking `ps` or parsing shell text, ProPack queries `NSWorkspace.shared.runningApplications`:
+In modern ProPresenter releases, Renewed Vision delegates its HTTP network listener to a dedicated helper process:
+`ProPresenter Helper (Network)` (or similar background processes) rather than the main GUI process.
 
-```swift
-@MainActor
-static func runningProPresenterPIDs() -> [pid_t] {
-    NSWorkspace.shared.runningApplications
-        .filter { $0.bundleIdentifier?.lowercased().hasPrefix("com.renewedvision.propresenter") ?? false }
-        .map(\.processIdentifier)
-}
-```
-
-This guarantees fast execution with zero shell spawning overhead and accurately matches both official releases and sub-version variations (e.g. `com.renewedvision.propresenter7`).
+`PortDetector` handles this with a dual-discovery strategy:
+1. **Direct command-name inspection via `lsof`**:
+   ```bash
+   /usr/sbin/lsof -nP -a -c ProPresenter -c "ProPresenter Helper" -iTCP -sTCP:LISTEN -Fn
+   ```
+   This immediately identifies sockets owned by either the main application or any background network helper daemons.
+2. **PID matching fallback**:
+   Queries both `NSWorkspace.shared.runningApplications` and `pgrep -i propresenter` to collect all parent and child process IDs.
 
 ---
 
-## 2. Listening Socket Inspection (`lsof`)
+## 2. Listening Socket Inspection & Verification
 
-Once the PID is known, `PortDetector` invokes macOS's built-in `/usr/sbin/lsof`:
-
-```bash
-/usr/sbin/lsof -nP -a -p <PID> -iTCP -sTCP:LISTEN -Fn
-```
+Once candidate ports are extracted:
 
 - `-nP`: Disables network hostname and service port lookups (critical for speed).
 - `-a`: Combines selection criteria with logical AND.
