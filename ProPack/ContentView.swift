@@ -91,10 +91,21 @@ struct ConnectionSetupView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Connect to ProPresenter").font(.title2.bold())
-                Text("ProPack reads playlists from ProPresenter's local network API and packages the matching .pro files.")
-                    .foregroundStyle(.secondary)
+            HStack(spacing: 16) {
+                if let iconImage = NSImage(named: "AppIcon") ?? NSApplication.shared.applicationIconImage {
+                    Image(nsImage: iconImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 56, height: 56)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Connect to ProPresenter").font(.title2.bold())
+                    Text("ProPack reads playlists from ProPresenter's local network API and packages the matching .pro files.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             GroupBox {
