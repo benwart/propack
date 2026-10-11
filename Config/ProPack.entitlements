@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	App Sandbox is intentionally OFF: a sandboxed process cannot use lsof to inspect
+	ProPresenter's sockets, and the library may live anywhere under ~/Documents or
+	~/Library/Application Support. Hardened Runtime remains enabled for notarization.
+	-->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+</dict>
+</plist>
