@@ -26,10 +26,20 @@ install: app
 	@cp -R $(APP_BUNDLE) /Applications/
 	@echo "==> Installed successfully to /Applications/$(APP_NAME).app"
 
+## docs: Build documentation site using uv
+docs:
+	@echo "==> Building documentation site with uv..."
+	@uv run --group docs mkdocs build --strict
+
+## docs-serve: Serve documentation locally with hot reloading using uv
+docs-serve:
+	@echo "==> Serving documentation with uv at http://127.0.0.1:8000..."
+	@uv run --group docs mkdocs serve
+
 ## clean: Remove dist/ and build artifacts
 clean:
 	@echo "==> Cleaning build artifacts..."
-	@rm -rf $(DIST_DIR) .build/modcache .build/*.iconset
+	@rm -rf $(DIST_DIR) site/ .build/modcache .build/*.iconset .venv/
 
 ## help: Display this help message
 help:

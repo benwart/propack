@@ -1,0 +1,9 @@
+# asdf tool versions for ProPack development & compilation
+#
+# Swift / macOS SDK:
+# Swift on macOS uses the native toolchain managed by macOS CommandLineTools / Xcode:
+#   xcode-select -p -> /Library/Developer/CommandLineTools (Swift 6.4+)
+#
+# uv (Python package & environment runner):
+# Used for fast, zero-configuration execution of MkDocs and docs workflows.
+uv 0.11.17

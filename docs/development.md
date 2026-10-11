@@ -52,24 +52,20 @@ ProPack includes a standalone mock server and test harness to simulate ProPresen
 
 ## Documentation Generator Guide
 
-### Generating HTML Docs with MkDocs
+### Generating HTML Docs with MkDocs & uv
 
 ProPack docs are authored in Markdown and configured for [MkDocs](https://www.mkdocs.org/) with the **Material for MkDocs** theme (`mkdocs-material`) featuring **dark mode by default**.
 
-#### Installation
-
-Install MkDocs and Material for MkDocs:
-
-```bash
-pip install mkdocs mkdocs-material
-```
+Python tool dependencies are managed via **[uv](https://github.com/astral-sh/uv)** (specified in `.tool-versions` and `pyproject.toml`). You do not need to install Python or MkDocs globally.
 
 #### Running the Development Server
 
 To preview the documentation locally with hot reloading:
 
 ```bash
-mkdocs serve
+make docs-serve
+# Or directly:
+uv run --group docs mkdocs serve
 ```
 
 Open `http://127.0.0.1:8000` in your web browser.
@@ -79,7 +75,9 @@ Open `http://127.0.0.1:8000` in your web browser.
 To compile the documentation into a standalone static site in `site/`:
 
 ```bash
-mkdocs build
+make docs
+# Or directly:
+uv run --group docs mkdocs build --strict
 ```
 
 ---
