@@ -1,6 +1,7 @@
 site_name: ProPack Documentation
 site_description: Documentation for ProPack - ProPresenter Playlist Pack Exporter (macOS Native)
 site_author: Ben Wart
+site_url: https://benwart.github.io/propack/
 repo_url: https://github.com/benwart/propack
 repo_name: benwart/propack
 
