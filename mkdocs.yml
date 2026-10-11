@@ -6,18 +6,20 @@ repo_name: benwart/propack
 
 theme:
   name: material
+  logo: assets/logo.png
+  favicon: assets/favicon.png
   palette:
     # Default to Dark Mode (Slate)
     - scheme: slate
-      primary: indigo
-      accent: deep purple
+      primary: deep orange
+      accent: amber
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
     # Light mode toggle option
     - scheme: default
-      primary: indigo
-      accent: deep purple
+      primary: deep orange
+      accent: amber
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode

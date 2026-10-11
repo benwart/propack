@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/logo.png" alt="ProPack App Icon" width="128" height="128" />
+</p>
+
 # ProPack: ProPresenter Playlist Pack Exporter
 
 Native macOS utility (macOS 14+ / 15+, SwiftUI) with **zero external runtime dependencies** that connects to a local ProPresenter instance, lets you select a playlist, and exports a standalone `.zip` archive containing the source `.pro` presentation files, active arrangement mappings, slide group metadata, and a comprehensive `manifest.json`.

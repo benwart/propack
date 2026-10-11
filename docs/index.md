@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="ProPack Logo" width="128" height="128" />
+</p>
+
 # ProPack
 
 **ProPack** is a lightweight, high-performance macOS utility built natively in Swift and SwiftUI. It connects to an active ProPresenter instance, inspects selected service playlists, locates the underlying `.pro` files across local libraries, and exports a clean `.zip` archive containing the presentations, active arrangements, and an extensive metadata `manifest.json`.
