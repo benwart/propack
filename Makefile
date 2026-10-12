@@ -6,7 +6,7 @@ DIST_DIR = dist
 APP_BUNDLE = $(DIST_DIR)/$(APP_NAME).app
 SIGNING_IDENTITY ?= -
 
-.PHONY: all app run clean install help docs docs-serve
+.PHONY: all app run clean install uninstall help docs docs-serve
 
 all: app
 
@@ -25,6 +25,16 @@ install: app
 	@echo "==> Installing $(APP_BUNDLE) to /Applications..."
 	@cp -R $(APP_BUNDLE) /Applications/
 	@echo "==> Installed successfully to /Applications/$(APP_NAME).app"
+
+## uninstall: Remove ProPack.app, unregister file extensions, and clear preferences
+uninstall:
+	@echo "==> Uninstalling $(APP_NAME)..."
+	@/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u /Applications/$(APP_NAME).app 2>/dev/null || true
+	@/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u $(APP_BUNDLE) 2>/dev/null || true
+	@rm -rf /Applications/$(APP_NAME).app $(DIST_DIR)
+	@defaults delete com.benwart.propack 2>/dev/null || true
+	@rm -rf "$${TMPDIR:-/tmp/}ProPack"
+	@echo "==> $(APP_NAME) successfully uninstalled and unreferenced from LaunchServices."
 
 ## docs: Build documentation site using uv
 docs:
