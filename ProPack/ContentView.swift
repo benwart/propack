@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct ContentView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
@@ -103,6 +104,7 @@ struct ContentView: View {
 
 // MARK: - Connection
 
+@MainActor
 struct ConnectionBadge: View {
     let state: AppModel.ConnectionState
     let port: Int?
@@ -139,6 +141,7 @@ struct ConnectionBadge: View {
     }
 }
 
+@MainActor
 struct ConnectionSetupView: View {
     @Environment(AppModel.self) private var model
     @Binding var port: Int
@@ -222,6 +225,7 @@ struct ConnectionSetupView: View {
     }
 }
 
+@MainActor
 private struct SetupStep: View {
     let number: Int
     let title: String
@@ -243,6 +247,7 @@ private struct SetupStep: View {
 
 // MARK: - Sidebar
 
+@MainActor
 struct PlaylistSidebar: View {
     @Environment(AppModel.self) private var model
 
@@ -285,6 +290,7 @@ struct PlaylistSidebar: View {
 
 // MARK: - Detail
 
+@MainActor
 struct PlaylistDetailView: View {
     @Environment(AppModel.self) private var model
 
@@ -341,6 +347,7 @@ struct PlaylistDetailView: View {
     }
 }
 
+@MainActor
 struct PresentationTable: View {
     let entries: [ExportPlan.Entry]
 
@@ -399,6 +406,7 @@ struct PresentationTable: View {
     }
 }
 
+@MainActor
 struct LibraryBar: View {
     @Environment(AppModel.self) private var model
     let plan: ExportPlan
@@ -434,6 +442,7 @@ struct LibraryBar: View {
     }
 }
 
+@MainActor
 struct ExportBar: View {
     @Environment(AppModel.self) private var model
 

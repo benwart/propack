@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct ImportSheetView: View {
     @Environment(AppModel.self) private var model
 

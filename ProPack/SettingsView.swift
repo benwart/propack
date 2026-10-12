@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 
+@MainActor
 struct SettingsView: View {
     @AppStorage("proPresenterPort") private var port: Int = 0
     @AppStorage("autoConnectOnLaunch") private var autoConnectOnLaunch: Bool = true

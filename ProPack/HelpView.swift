@@ -112,6 +112,7 @@ struct HelpWebView: NSViewRepresentable {
 
 // MARK: - Help Window View
 
+@MainActor
 struct HelpWindowView: View {
     @StateObject private var navState = HelpNavigationState()
 

@@ -3,6 +3,7 @@ import SwiftUI
 
 // MARK: - History UI View
 
+@MainActor
 struct TransferHistoryView: View {
     @ObservedObject var store: TransferHistoryStore = .shared
     @Environment(\.dismiss) private var dismiss
@@ -150,6 +151,7 @@ struct TransferHistoryView: View {
     }
 }
 
+@MainActor
 private struct TransferRecordRow: View {
     let record: TransferRecord
 
