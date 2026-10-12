@@ -66,8 +66,7 @@ final class HelpNavigationState: ObservableObject {
     }
 }
 
-@MainActor
-final class HelpNavDelegate: NSObject, WKNavigationDelegate {
+final class HelpNavDelegate: NSObject, WKNavigationDelegate, @unchecked Sendable {
     let state: HelpNavigationState
 
     init(state: HelpNavigationState) {
@@ -75,11 +74,13 @@ final class HelpNavDelegate: NSObject, WKNavigationDelegate {
         super.init()
     }
 
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        state.canGoBack = webView.canGoBack
-        state.canGoForward = webView.canGoForward
-        if let title = webView.title, !title.isEmpty {
-            state.currentTitle = title
+    nonisolated func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        MainActor.assumeIsolated {
+            state.canGoBack = webView.canGoBack
+            state.canGoForward = webView.canGoForward
+            if let title = webView.title, !title.isEmpty {
+                state.currentTitle = title
+            }
         }
     }
 }
