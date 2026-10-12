@@ -20,6 +20,7 @@ swiftc \
     "${PROJECT_DIR}/ProPack/ProPresenterClient.swift" \
     "${PROJECT_DIR}/ProPack/LibraryLocator.swift" \
     "${PROJECT_DIR}/ProPack/MediaLocator.swift" \
+    "${PROJECT_DIR}/ProPack/TransferHistory.swift" \
     "${PROJECT_DIR}/ProPack/ExportService.swift" \
     "${PROJECT_DIR}/ProPack/ImportService.swift" \
     "${PROJECT_DIR}/Tests"/*.swift

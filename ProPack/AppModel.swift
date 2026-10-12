@@ -276,7 +276,20 @@ final class AppModel {
                         self.exportState = .running(progress)
                     }
                 }
-                self?.exportState = .finished(result)
+                guard let self else { return }
+                self.exportState = .finished(result)
+                let fileSizeBytes = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? NSNumber)?.int64Value
+                let record = TransferRecord(
+                    type: .export,
+                    playlistName: plan.playlist.name,
+                    presentationCount: result.includedFiles,
+                    mediaCount: result.includedMediaFiles,
+                    filePath: destination.path,
+                    fileSizeBytes: fileSizeBytes,
+                    status: .completed,
+                    detail: "Exported \(result.includedFiles) presentation(s) and \(result.includedMediaFiles) media file(s) to \(destination.lastPathComponent)"
+                )
+                TransferHistoryStore.shared.record(record)
             } catch is CancellationError {
                 self?.exportState = .idle
             } catch {
@@ -334,6 +347,17 @@ final class AppModel {
                         self.currentAirDropTempDirectory = nil
                         switch airDropResult {
                         case .success:
+                            let record = TransferRecord(
+                                type: .airdrop,
+                                playlistName: plan.playlist.name,
+                                presentationCount: result.includedFiles,
+                                mediaCount: result.includedMediaFiles,
+                                filePath: nil,
+                                fileSizeBytes: (try? FileManager.default.attributesOfItem(atPath: result.archiveURL.path)[.size] as? NSNumber)?.int64Value,
+                                status: .completed,
+                                detail: "Transferred \(result.includedFiles) presentation(s) and \(result.includedMediaFiles) media file(s) via AirDrop"
+                            )
+                            TransferHistoryStore.shared.record(record)
                             self.exportState = .airDropFinished(playlistName: plan.playlist.name)
                         case .failure(let error):
                             if case AirDropService.AirDropError.cancelled = error {
@@ -452,6 +476,24 @@ final class AppModel {
                     }
                 }
                 self.importState = .finished(result)
+                var summaryParts: [String] = []
+                if result.importedSongsCount > 0 { summaryParts.append("\(result.importedSongsCount) imported") }
+                if result.renamedSongsCount > 0 { summaryParts.append("\(result.renamedSongsCount) renamed") }
+                if result.skippedSongsCount > 0 { summaryParts.append("\(result.skippedSongsCount) skipped") }
+                if result.importedMediaCount > 0 { summaryParts.append("\(result.importedMediaCount) media") }
+                let detailMsg = "\(package.playlistName) → \(result.targetLibraryName) (\(summaryParts.joined(separator: ", ")))"
+                let fileSizeBytes = (try? FileManager.default.attributesOfItem(atPath: package.archiveURL.path)[.size] as? NSNumber)?.int64Value
+                let record = TransferRecord(
+                    type: .import,
+                    playlistName: package.playlistName,
+                    presentationCount: result.importedSongsCount + result.renamedSongsCount,
+                    mediaCount: result.importedMediaCount,
+                    filePath: package.archiveURL.path,
+                    fileSizeBytes: fileSizeBytes,
+                    status: .completed,
+                    detail: detailMsg
+                )
+                TransferHistoryStore.shared.record(record)
                 await self.reloadPlaylists()
             } catch is CancellationError {
                 self.importState = .idle

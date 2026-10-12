@@ -5,6 +5,7 @@ struct ContentView: View {
     @Environment(\.openWindow) private var openWindow
     @AppStorage("proPresenterPort") private var port: Int = 0
     private var showConnectionSheetState = State(initialValue: false)
+    private var showHistorySheetState = State(initialValue: false)
 
     var body: some View {
         NavigationSplitView {
@@ -39,6 +40,14 @@ struct ContentView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
+                    showHistorySheetState.wrappedValue = true
+                } label: {
+                    Label("History", systemImage: "clock.arrow.circlepath")
+                }
+                .help("Transfer History & Audit Log")
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
                     openWindow(id: "help")
                 } label: {
                     Label("Help", systemImage: "questionmark.circle")
@@ -57,6 +66,9 @@ struct ContentView: View {
                 .padding()
             }
             .frame(width: 560, height: 600)
+        }
+        .sheet(isPresented: showHistorySheetState.projectedValue) {
+            TransferHistoryView()
         }
         .sheet(isPresented: Binding(
             get: { model.isImportSheetPresented },

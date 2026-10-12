@@ -10,6 +10,7 @@ func main() async {
     await runManifestTests()
     await runConflictResolutionTests()
     await runMediaLocatorTests()
+    await runTransferHistoryTests()
     await runZipRoundtripTests()
 
     let code = TestSuite.shared.report()
