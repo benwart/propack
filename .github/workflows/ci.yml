@@ -27,8 +27,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check uv lockfile consistency
+        run: uv lock --check
+
       - name: Build offline documentation
-        run: uv run --group docs mkdocs build
+        run: uv run --group docs mkdocs build --strict
 
       - name: Run unit test suite
         run: make test

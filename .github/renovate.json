@@ -1,0 +1,57 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "semanticCommits": "enabled",
+  "semanticCommitType": "chore",
+  "semanticCommitScope": "deps",
+  "dependencyDashboard": true,
+  "labels": [
+    "dependencies"
+  ],
+  "packageRules": [
+    {
+      "description": "Group GitHub Actions updates",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions",
+      "automerge": false
+    },
+    {
+      "description": "Group semantic-release ecosystem packages",
+      "matchPackagePatterns": [
+        "^@?semantic-release"
+      ],
+      "groupName": "semantic-release plugins",
+      "automerge": false
+    },
+    {
+      "description": "Group documentation Python dependencies",
+      "matchManagers": [
+        "pep621"
+      ],
+      "groupName": "documentation dependencies",
+      "automerge": false
+    },
+    {
+      "description": "Group minor and patch updates together to reduce PR noise",
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "all non-major dependencies",
+      "groupSlug": "all-minor-patch"
+    }
+  ],
+  "asdf": {
+    "enabled": true
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 5am on monday"
+    ]
+  }
+}

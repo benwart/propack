@@ -4,6 +4,7 @@
   "private": true,
   "description": "ProPresenter Playlist Pack Exporter (macOS Native)",
   "scripts": {
+    "test": "make test",
     "release": "semantic-release",
     "release:dry": "semantic-release --dry-run"
   },
