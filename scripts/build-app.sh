@@ -36,6 +36,16 @@ if [ -f "${PROJECT_DIR}/ProPack/AppIcon.icns" ]; then
     cp "${PROJECT_DIR}/ProPack/AppIcon.icns" "${RESOURCES_DIR}/AppIcon.icns"
 fi
 
+# 3. Build & bundle offline Help documentation
+echo "==> Bundling offline Help documentation..."
+HELP_DIR="${RESOURCES_DIR}/Help"
+mkdir -p "${HELP_DIR}"
+if command -v uv >/dev/null 2>&1; then
+    uv run --group docs mkdocs build --strict -d "${HELP_DIR}"
+elif [ -d "${PROJECT_DIR}/site" ]; then
+    cp -R "${PROJECT_DIR}/site/"* "${HELP_DIR}/"
+fi
+
 # 3. Generate Info.plist
 echo "==> Generating Contents/Info.plist..."
 cat << 'EOF' > "${CONTENTS_DIR}/Info.plist"
@@ -72,6 +82,10 @@ cat << 'EOF' > "${CONTENTS_DIR}/Info.plist"
     </dict>
     <key>NSDocumentsFolderUsageDescription</key>
     <string>ProPack reads ProPresenter presentation files from your Documents folder to include them in exported playlist packages.</string>
+    <key>CFBundleHelpBookFolder</key>
+    <string>Help</string>
+    <key>CFBundleHelpBookName</key>
+    <string>com.benwart.propack.help</string>
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>

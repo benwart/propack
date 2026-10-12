@@ -52,6 +52,31 @@ struct ProPackApp: App {
                 .keyboardShortcut("e", modifiers: .command)
                 .disabled(modelState.wrappedValue.plan == nil || modelState.wrappedValue.plan?.resolvedCount == 0 || modelState.wrappedValue.isExporting)
             }
+            CommandGroup(replacing: .help) {
+                HelpMenuCommands()
+            }
+        }
+
+        Window("ProPack Help", id: "help") {
+            HelpWindowView()
+                .frame(minWidth: 780, minHeight: 520)
+        }
+        .defaultSize(width: 920, height: 660)
+    }
+}
+
+private struct HelpMenuCommands: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("ProPack Help") {
+            openWindow(id: "help")
+        }
+        .keyboardShortcut("?", modifiers: .command)
+
+        Button("Open Help in Browser…") {
+            HelpService.openInBrowser()
         }
     }
 }
+

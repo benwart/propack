@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
     @AppStorage("proPresenterPort") private var port: Int = 0
     private var showConnectionSheetState = State(initialValue: false)
 
@@ -35,6 +36,14 @@ struct ContentView: View {
                     Label("Import…", systemImage: "square.and.arrow.down")
                 }
                 .help("Import a ProPack package into ProPresenter (Cmd+I)")
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    openWindow(id: "help")
+                } label: {
+                    Label("Help", systemImage: "questionmark.circle")
+                }
+                .help("Open ProPack Help (Cmd+?)")
             }
         }
         .sheet(isPresented: showConnectionSheetState.projectedValue) {
