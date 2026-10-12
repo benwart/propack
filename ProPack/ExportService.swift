@@ -20,14 +20,35 @@ struct ExportPlan: Sendable {
     let playlist: PPIdentifier
     let proPresenter: PPVersion?
     let entries: [Entry]
+    let referencedMedia: [MediaAsset]
     let libraryRoots: [URL]
     /// Library folder inferred from an API `presentation_path`, if any.
     let discoveredLibraryRoot: URL?
     let preparedAt: Date
 
+    init(
+        playlist: PPIdentifier,
+        proPresenter: PPVersion?,
+        entries: [Entry],
+        referencedMedia: [MediaAsset] = [],
+        libraryRoots: [URL],
+        discoveredLibraryRoot: URL?,
+        preparedAt: Date
+    ) {
+        self.playlist = playlist
+        self.proPresenter = proPresenter
+        self.entries = entries
+        self.referencedMedia = referencedMedia
+        self.libraryRoots = libraryRoots
+        self.discoveredLibraryRoot = discoveredLibraryRoot
+        self.preparedAt = preparedAt
+    }
+
     var presentationEntries: [Entry] { entries.filter(\.isPresentation) }
     var resolvedCount: Int { presentationEntries.filter { $0.match != nil }.count }
     var missingCount: Int { presentationEntries.count - resolvedCount }
+    var totalMediaSizeBytes: Int64 { referencedMedia.reduce(0) { $0 + $1.sizeBytes } }
+    var formattedMediaSize: String { ByteCountFormatter.string(fromByteCount: totalMediaSizeBytes, countStyle: .file) }
 }
 
 // MARK: - Progress
@@ -54,6 +75,7 @@ typealias ProgressHandler = @Sendable (ExportProgress) -> Void
 struct ExportResult: Sendable {
     let archiveURL: URL
     let includedFiles: Int
+    let includedMediaFiles: Int
     let missingPresentations: [String]
 }
 
@@ -156,6 +178,9 @@ struct ExportService: Sendable {
         }.value
         try Task.checkCancellation()
 
+        let uniqueSources = Self.orderedUnique(matches.values.map(\.url))
+        let referencedMedia = MediaLocator.findReferencedMedia(inProFiles: uniqueSources)
+
         let entries = detail.items.map { item -> ExportPlan.Entry in
             let uuid = item.presentationInfo?.presentationUuid
             return ExportPlan.Entry(
@@ -170,6 +195,7 @@ struct ExportService: Sendable {
             playlist: detail.identifier,
             proPresenter: await versionTask,
             entries: entries,
+            referencedMedia: referencedMedia,
             libraryRoots: roots,
             discoveredLibraryRoot: discoveredRoot,
             preparedAt: Date()
@@ -178,8 +204,10 @@ struct ExportService: Sendable {
 
     // MARK: Export
 
+    static let mediaFolder = "Media"
+
     /// Stages files + `manifest.json` in a temp folder and zips it to `destination` with `ditto`.
-    func export(plan: ExportPlan, to destination: URL, progress: ProgressHandler? = nil) async throws -> ExportResult {
+    func export(plan: ExportPlan, to destination: URL, includeMedia: Bool = false, progress: ProgressHandler? = nil) async throws -> ExportResult {
         let presentationEntries = plan.presentationEntries
         guard !presentationEntries.isEmpty else { throw ExportError.noPresentations }
         let missing = presentationEntries.filter { $0.match == nil }.map(\.item.name)
@@ -221,8 +249,36 @@ struct ExportService: Sendable {
             throw ExportError.staging(error.localizedDescription)
         }
 
-        // 2. manifest.json
-        let manifest = Manifest(plan: plan, files: fileInfo)
+        // 2. Media files (if requested and present)
+        var mediaFileInfo: [Manifest.FileInfo] = []
+        if includeMedia && !plan.referencedMedia.isEmpty {
+            do {
+                try fm.createDirectory(at: packageDir.appending(path: Self.mediaFolder), withIntermediateDirectories: true)
+                for (index, media) in plan.referencedMedia.enumerated() {
+                    try Task.checkCancellation()
+                    progress?(.init(
+                        phase: .staging,
+                        message: "Copying media: \(media.filename)",
+                        fraction: Double(index) / Double(plan.referencedMedia.count)
+                    ))
+                    let relative = "\(Self.mediaFolder)/\(media.filename)"
+                    let target = packageDir.appending(path: relative)
+                    if !fm.fileExists(atPath: target.path) {
+                        try fm.copyItem(at: media.url, to: target)
+                    }
+                    if let info = try? Self.fileInfo(packagePath: relative, source: media.url, copy: target) {
+                        mediaFileInfo.append(info)
+                    }
+                }
+            } catch let error as CancellationError {
+                throw error
+            } catch {
+                throw ExportError.staging("Media: \(error.localizedDescription)")
+            }
+        }
+
+        // 3. manifest.json
+        let manifest = Manifest(plan: plan, files: fileInfo, media: mediaFileInfo)
         do {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
@@ -233,7 +289,7 @@ struct ExportService: Sendable {
             throw ExportError.staging("manifest.json: \(error.localizedDescription)")
         }
 
-        // 3. Compress. --keepParent puts everything under a single top-level folder in the archive.
+        // 4. Compress. --keepParent puts everything under a single top-level folder in the archive.
         try Task.checkCancellation()
         progress?(.init(phase: .compressing, message: "Creating \(destination.lastPathComponent)…", fraction: nil))
         if fm.fileExists(atPath: destination.path) {
@@ -247,8 +303,13 @@ struct ExportService: Sendable {
             throw ExportError.ditto(status: output.status, message: output.stderrString)
         }
 
-        progress?(.init(phase: .done, message: "Exported \(uniqueSources.count) file(s)", fraction: 1))
-        return ExportResult(archiveURL: destination, includedFiles: uniqueSources.count, missingPresentations: missing)
+        progress?(.init(phase: .done, message: "Exported \(uniqueSources.count) presentation(s)\(mediaFileInfo.isEmpty ? "" : " and \(mediaFileInfo.count) media file(s)")", fraction: 1))
+        return ExportResult(
+            archiveURL: destination,
+            includedFiles: uniqueSources.count,
+            includedMediaFiles: mediaFileInfo.count,
+            missingPresentations: missing
+        )
     }
 
     // MARK: Helpers
@@ -384,10 +445,12 @@ struct Manifest: Codable, Sendable {
     let libraryRoots: [String]
     let summary: Summary
     let items: [Item]
+    let media: [FileInfo]?
 
-    init(plan: ExportPlan, files: [URL: FileInfo], date: Date = Date()) {
+    init(plan: ExportPlan, files: [URL: FileInfo], media: [FileInfo] = [], date: Date = Date()) {
         let info = Bundle.main.infoDictionary
         exportedAt = date
+        self.media = media.isEmpty ? nil : media
         generator = Generator(
             name: info?["CFBundleName"] as? String ?? "ProPack",
             version: info?["CFBundleShortVersionString"] as? String ?? "dev"

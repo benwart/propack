@@ -433,6 +433,19 @@ struct ExportBar: View {
                 Button("Cancel") { model.cancelExport() }
             } else {
                 HStack(spacing: 8) {
+                    if let plan = model.plan, !plan.referencedMedia.isEmpty {
+                        Toggle(isOn: Binding(
+                            get: { model.includeMediaInExport },
+                            set: { model.includeMediaInExport = $0 }
+                        )) {
+                            Label("Media (\(plan.referencedMedia.count))", systemImage: "photo.on.rectangle")
+                                .font(.callout)
+                        }
+                        .toggleStyle(.checkbox)
+                        .help("Include \(plan.referencedMedia.count) referenced media files (\(plan.formattedMediaSize)) in the package")
+                        Divider().frame(height: 16)
+                    }
+
                     Button {
                         model.beginAirDrop()
                     } label: {

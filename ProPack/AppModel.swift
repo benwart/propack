@@ -64,6 +64,7 @@ final class AppModel {
 
     // Export
     private(set) var exportState: ExportState = .idle
+    var includeMediaInExport: Bool = true
 
     // Import
     var importState: ImportState = .idle
@@ -265,10 +266,11 @@ final class AppModel {
         guard panel.runModal() == .OK, let destination = panel.url else { return }
 
         let service = ExportService(client: client)
+        let includeMedia = includeMediaInExport
         exportState = .running(.init(phase: .staging, message: "Preparing…", fraction: 0))
         exportTask = Task { [weak self] in
             do {
-                let result = try await service.export(plan: plan, to: destination) { progress in
+                let result = try await service.export(plan: plan, to: destination, includeMedia: includeMedia) { progress in
                     Task { @MainActor in
                         guard let self, self.isExporting else { return }
                         self.exportState = .running(progress)
@@ -303,11 +305,12 @@ final class AppModel {
         let archiveDestination = tempDirectory.appending(path: fileName)
 
         let service = ExportService(client: client)
+        let includeMedia = includeMediaInExport
         exportState = .running(.init(phase: .staging, message: "Preparing AirDrop package…", fraction: 0))
 
         exportTask = Task { [weak self] in
             do {
-                let result = try await service.export(plan: plan, to: archiveDestination) { progress in
+                let result = try await service.export(plan: plan, to: archiveDestination, includeMedia: includeMedia) { progress in
                     Task { @MainActor in
                         guard let self, self.isExporting else { return }
                         self.exportState = .running(progress)

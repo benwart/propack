@@ -9,6 +9,7 @@ func main() async {
     await runPPVersionTests()
     await runManifestTests()
     await runConflictResolutionTests()
+    await runMediaLocatorTests()
     await runZipRoundtripTests()
 
     let code = TestSuite.shared.report()

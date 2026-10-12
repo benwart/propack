@@ -99,18 +99,35 @@ struct ImportPresentationItem: Identifiable, Sendable {
     let groupNames: [String]
 }
 
+struct ImportMediaItem: Identifiable, Sendable {
+    let id: String
+    let filename: String
+    let stagedFileURL: URL
+    let sizeBytes: Int64
+    let kind: MediaAsset.Kind
+
+    var formattedSize: String {
+        ByteCountFormatter.string(fromByteCount: sizeBytes, countStyle: .file)
+    }
+}
+
 struct ImportPackage: Sendable {
     let archiveURL: URL
     let stagingDirectory: URL
     let manifest: Manifest
     let playlistName: String
     let presentations: [ImportPresentationItem]
+    let media: [ImportMediaItem]
+
+    var totalMediaSizeBytes: Int64 { media.reduce(0) { $0 + $1.sizeBytes } }
+    var formattedMediaSize: String { ByteCountFormatter.string(fromByteCount: totalMediaSizeBytes, countStyle: .file) }
 }
 
 struct ImportResult: Sendable {
     let importedSongsCount: Int
     let skippedSongsCount: Int
     let renamedSongsCount: Int
+    let importedMediaCount: Int
     let playlistName: String?
     let targetLibraryName: String
 }
@@ -196,12 +213,45 @@ struct ImportService: Sendable {
             }
         }
 
+        var mediaItems: [ImportMediaItem] = []
+        if let manifestMedia = manifest.media {
+            for mediaInfo in manifestMedia {
+                let staged = packageRootDir.appending(path: mediaInfo.packagePath)
+                if fm.fileExists(atPath: staged.path) {
+                    let kind = MediaAsset.Kind.from(extension: staged.pathExtension)
+                    mediaItems.append(ImportMediaItem(
+                        id: mediaInfo.sha256,
+                        filename: staged.lastPathComponent,
+                        stagedFileURL: staged,
+                        sizeBytes: Int64(mediaInfo.sizeBytes),
+                        kind: kind
+                    ))
+                }
+            }
+        } else {
+            let mediaFolder = packageRootDir.appending(path: "Media", directoryHint: .isDirectory)
+            if let entries = try? fm.contentsOfDirectory(at: mediaFolder, includingPropertiesForKeys: [.fileSizeKey]) {
+                for staged in entries {
+                    let size = (try? staged.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0
+                    let kind = MediaAsset.Kind.from(extension: staged.pathExtension)
+                    mediaItems.append(ImportMediaItem(
+                        id: staged.lastPathComponent,
+                        filename: staged.lastPathComponent,
+                        stagedFileURL: staged,
+                        sizeBytes: size,
+                        kind: kind
+                    ))
+                }
+            }
+        }
+
         return ImportPackage(
             archiveURL: archiveURL,
             stagingDirectory: stagingDir,
             manifest: manifest,
             playlistName: manifest.playlist.name,
-            presentations: presentationItems
+            presentations: presentationItems,
+            media: mediaItems
         )
     }
 
@@ -225,6 +275,22 @@ struct ImportService: Sendable {
         var skippedCount = 0
         var renamedCount = 0
         var installedPresentationFiles: [String: URL] = [:] // presentationUUID -> installed URL
+
+        // 0. Copy media assets if present
+        var importedMediaCount = 0
+        if !package.media.isEmpty {
+            let mediaTargetDir = FileManager.default.homeDirectoryForCurrentUser
+                .appending(path: "Documents/ProPresenter/Media", directoryHint: .isDirectory)
+            try? fm.createDirectory(at: mediaTargetDir, withIntermediateDirectories: true)
+            for mediaItem in package.media {
+                let dest = mediaTargetDir.appending(path: mediaItem.filename)
+                if !fm.fileExists(atPath: dest.path) {
+                    if (try? fm.copyItem(at: mediaItem.stagedFileURL, to: dest)) != nil {
+                        importedMediaCount += 1
+                    }
+                }
+            }
+        }
 
         // 1. Copy presentation files into target library
         let totalPresentations = max(package.presentations.count, 1)
@@ -352,6 +418,7 @@ struct ImportService: Sendable {
             importedSongsCount: importedCount,
             skippedSongsCount: skippedCount,
             renamedSongsCount: renamedCount,
+            importedMediaCount: importedMediaCount,
             playlistName: finalPlaylistName,
             targetLibraryName: targetLibraryURL.lastPathComponent
         )
