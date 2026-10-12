@@ -23,8 +23,12 @@ run: app
 ## install: Install ProPack.app into /Applications
 install: app
 	@echo "==> Installing $(APP_BUNDLE) to /Applications..."
+	@rm -rf /Applications/$(APP_NAME).app
 	@cp -R $(APP_BUNDLE) /Applications/
-	@echo "==> Installed successfully to /Applications/$(APP_NAME).app"
+	@touch /Applications/$(APP_NAME).app
+	@/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/$(APP_NAME).app 2>/dev/null || true
+	@killall Dock 2>/dev/null || true
+	@echo "==> Installed successfully to /Applications/$(APP_NAME).app (icon cache refreshed)"
 
 ## uninstall: Remove ProPack.app, unregister file extensions, and clear preferences
 uninstall:
