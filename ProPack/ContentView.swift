@@ -143,7 +143,17 @@ struct ConnectionSetupView: View {
                         .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Connect to ProPresenter").font(.title2.bold())
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("Connect to ProPresenter").font(.title2.bold())
+                        if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+                            Text("v\(version)")
+                                .font(.caption.bold())
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(.quaternary))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                     Text("ProPack reads playlists from ProPresenter's local network API and packages the matching .pro files.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)

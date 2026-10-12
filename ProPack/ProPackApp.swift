@@ -31,6 +31,16 @@ struct ProPackApp: App {
         }
         .defaultSize(width: 1000, height: 640)
         .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("About ProPack") {
+                    let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
+                    let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+                    NSApplication.shared.orderFrontStandardAboutPanel(options: [
+                        .applicationVersion: version,
+                        .version: build
+                    ])
+                }
+            }
             CommandGroup(replacing: .newItem) {}
             CommandGroup(replacing: .importExport) {
                 Button("Import Package…") {

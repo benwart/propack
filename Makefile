@@ -5,15 +5,35 @@ APP_NAME = ProPack
 DIST_DIR = dist
 APP_BUNDLE = $(DIST_DIR)/$(APP_NAME).app
 SIGNING_IDENTITY ?= -
+APP_VERSION ?= $(shell node scripts/get-version.js 2>/dev/null || echo 0.1.0)
+DMG_PATH = $(DIST_DIR)/$(APP_NAME)-$(APP_VERSION).dmg
 
-.PHONY: all app run clean install uninstall help docs docs-serve
+.PHONY: all app dmg run clean install uninstall help docs docs-serve release release-dry version
 
 all: app
 
 ## app: Build and code-sign the standalone ProPack.app bundle
 app:
-	@echo "==> Building $(APP_BUNDLE)..."
-	@SIGNING_IDENTITY="$(SIGNING_IDENTITY)" ./scripts/build-app.sh
+	@echo "==> Building $(APP_BUNDLE) (v$(APP_VERSION))..."
+	@APP_VERSION="$(APP_VERSION)" SIGNING_IDENTITY="$(SIGNING_IDENTITY)" ./scripts/build-app.sh
+
+## dmg: Build the compressed installer Disk Image (.dmg) and release ZIP
+dmg: app
+	@echo "==> Building $(DMG_PATH)..."
+	@APP_VERSION="$(APP_VERSION)" SIGNING_IDENTITY="$(SIGNING_IDENTITY)" ./scripts/create-dmg.sh
+
+## version: Display current and projected next version based on conventional commits
+version:
+	@echo "Current version: $(APP_VERSION)"
+	@echo "Next version:    $$(node scripts/get-version.js next 2>/dev/null || echo $(APP_VERSION))"
+
+## release: Trigger semantic-release to bump version, generate changelog, tag, and publish
+release:
+	@npx semantic-release
+
+## release-dry: Dry run semantic-release to preview next version and release notes
+release-dry:
+	@npx semantic-release --dry-run
 
 ## run: Build and launch ProPack.app
 run: app

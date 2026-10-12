@@ -46,9 +46,21 @@ elif [ -d "${PROJECT_DIR}/site" ]; then
     cp -R "${PROJECT_DIR}/site/"* "${HELP_DIR}/"
 fi
 
-# 3. Generate Info.plist
+# 4. Resolve App Version
+APP_VERSION="${APP_VERSION:-}"
+if [ -z "${APP_VERSION}" ]; then
+    if command -v node >/dev/null 2>&1 && [ -f "${PROJECT_DIR}/scripts/get-version.js" ]; then
+        APP_VERSION="$(node "${PROJECT_DIR}/scripts/get-version.js" 2>/dev/null || echo "0.1.0")"
+    else
+        APP_VERSION="0.1.0"
+    fi
+fi
+BUILD_NUMBER="${BUILD_NUMBER:-1}"
+echo "==> Packaging ProPack.app version ${APP_VERSION} (build ${BUILD_NUMBER})..."
+
+# 5. Generate Info.plist
 echo "==> Generating Contents/Info.plist..."
-cat << 'EOF' > "${CONTENTS_DIR}/Info.plist"
+cat << EOF > "${CONTENTS_DIR}/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -66,9 +78,9 @@ cat << 'EOF' > "${CONTENTS_DIR}/Info.plist"
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
+    <string>${APP_VERSION}</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>${BUILD_NUMBER}</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>LSApplicationCategoryType</key>

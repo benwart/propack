@@ -7,3 +7,8 @@
 # uv (Python package & environment runner):
 # Used for fast, zero-configuration execution of MkDocs and docs workflows.
 uv 0.11.17
+
+# Node.js:
+# Used for semantic-release and conventional commit release automation.
+nodejs 26.2.0
+

@@ -65,3 +65,9 @@ fastlane/test_output
 site/
 dist/
 .DS_Store
+
+# Python & Node
+node_modules/
+.venv/
+*.dmg
+*.zip
