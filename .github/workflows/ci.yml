@@ -36,5 +36,8 @@ jobs:
       - name: Build ProPack.app bundle
         run: make app
 
+      - name: Install create-dmg
+        run: brew install create-dmg
+
       - name: Build DMG installer
         run: make dmg
