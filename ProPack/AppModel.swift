@@ -18,6 +18,8 @@ final class AppModel {
     enum ExportState {
         case idle
         case running(ExportProgress)
+        case airDropping(playlistName: String)
+        case airDropFinished(playlistName: String)
         case finished(ExportResult)
         case failed(String)
     }
@@ -48,10 +50,12 @@ final class AppModel {
 
     private var planTask: Task<Void, Never>?
     private var exportTask: Task<Void, Never>?
+    private var currentAirDropTempDirectory: URL?
 
     private static let libraryBookmarkKey = "libraryBookmark"
 
     init() {
+        AirDropService.purgeAllTemporaryFiles()
         manualLibraryURL = Self.restoreLibraryBookmark()
     }
 
@@ -61,7 +65,12 @@ final class AppModel {
         selectedPlaylistID.flatMap { PPPlaylistNode.find($0, in: playlists) }
     }
 
-    var isExporting: Bool { if case .running = exportState { true } else { false } }
+    var isExporting: Bool {
+        switch exportState {
+        case .running, .airDropping: true
+        default: false
+        }
+    }
 
     // MARK: Connection
 
@@ -245,8 +254,84 @@ final class AppModel {
         }
     }
 
+    /// Exports the playlist to an isolated temporary folder, opens the native AirDrop dialog,
+    /// and deletes the temporary files once the transfer completes or is dismissed.
+    func beginAirDrop() {
+        guard let plan, let client, !isExporting else { return }
+
+        AirDropService.purgeAllTemporaryFiles()
+
+        let tempDirectory: URL
+        do {
+            tempDirectory = try AirDropService.createTemporaryExportDirectory()
+        } catch {
+            exportState = .failed("Could not prepare temporary export directory: \(error.localizedDescription)")
+            return
+        }
+
+        currentAirDropTempDirectory = tempDirectory
+        let fileName = ExportService.suggestedArchiveName(for: plan.playlist.name)
+        let archiveDestination = tempDirectory.appending(path: fileName)
+
+        let service = ExportService(client: client)
+        exportState = .running(.init(phase: .staging, message: "Preparing AirDrop package…", fraction: 0))
+
+        exportTask = Task { [weak self] in
+            do {
+                let result = try await service.export(plan: plan, to: archiveDestination) { progress in
+                    Task { @MainActor in
+                        guard let self, self.isExporting else { return }
+                        self.exportState = .running(progress)
+                    }
+                }
+
+                guard let self, !Task.isCancelled else {
+                    AirDropService.cleanup(directoryURL: tempDirectory)
+                    return
+                }
+
+                self.exportState = .airDropping(playlistName: plan.playlist.name)
+
+                let airDrop = AirDropService(
+                    directoryURL: tempDirectory,
+                    archiveURL: result.archiveURL,
+                    playlistName: plan.playlist.name
+                ) { [weak self] airDropResult in
+                    Task { @MainActor in
+                        guard let self else { return }
+                        self.currentAirDropTempDirectory = nil
+                        switch airDropResult {
+                        case .success:
+                            self.exportState = .airDropFinished(playlistName: plan.playlist.name)
+                        case .failure(let error):
+                            if case AirDropService.AirDropError.cancelled = error {
+                                self.exportState = .idle
+                            } else {
+                                self.exportState = .failed(error.localizedDescription)
+                            }
+                        }
+                    }
+                }
+                airDrop.start()
+            } catch is CancellationError {
+                AirDropService.cleanup(directoryURL: tempDirectory)
+                self?.currentAirDropTempDirectory = nil
+                self?.exportState = .idle
+            } catch {
+                AirDropService.cleanup(directoryURL: tempDirectory)
+                self?.currentAirDropTempDirectory = nil
+                self?.exportState = .failed(error.localizedDescription)
+            }
+        }
+    }
+
     func cancelExport() {
         exportTask?.cancel()
+        if let temp = currentAirDropTempDirectory {
+            AirDropService.cleanup(directoryURL: temp)
+            currentAirDropTempDirectory = nil
+        }
+        exportState = .idle
     }
 
     func revealInFinder(_ url: URL) {

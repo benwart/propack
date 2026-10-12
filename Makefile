@@ -6,7 +6,7 @@ DIST_DIR = dist
 APP_BUNDLE = $(DIST_DIR)/$(APP_NAME).app
 SIGNING_IDENTITY ?= -
 
-.PHONY: all app run clean install help
+.PHONY: all app run clean install help docs docs-serve
 
 all: app
 

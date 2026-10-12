@@ -137,3 +137,38 @@ The companion `manifest.json` file records all metadata about the export session
   ]
 }
 ```
+
+---
+
+## Direct AirDrop Export & Zero-Cruft Lifecycle
+
+ProPack supports direct transfer to iOS/macOS devices via Apple AirDrop without requiring the user to save files to disk first:
+
+```
+[User clicks AirDrop]
+       │
+       ▼
+1. Create temporary directory: <temp>/ProPack/AirDrop/<UUID>/
+       │
+       ▼
+2. Stage .pro files + manifest.json & compress via ditto to temporary .zip
+       │
+       ▼
+3. Present native AirDrop sheet (NSSharingService.sendViaAirDrop)
+       │
+       ▼
+4. User selects recipient device (e.g. iPhone) -> file transmitted
+       │
+       ▼
+5. NSSharingServiceDelegate completes:
+   - Success / Failure callback triggered
+   - Temporary directory automatically purged (with 4s daemon safety buffer)
+   - Zero file cruft left behind on user's Mac
+```
+
+### Cruft Prevention Guarantees
+
+1. **Session Cleanup**: Once the AirDrop transfer finishes (or is cancelled by the user), the temporary archive folder is unlinked automatically.
+2. **Cancellation Safety**: Cancelling mid-export immediately purges the staging directory.
+3. **App Launch Purge**: `AirDropService.purgeAllTemporaryFiles()` runs on application startup to cleanly delete any orphaned files from unexpected crashes or abrupt process terminations.
+

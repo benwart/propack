@@ -380,14 +380,37 @@ struct ExportBar: View {
             if model.isExporting {
                 Button("Cancel") { model.cancelExport() }
             } else {
-                Button {
-                    model.beginExport()
-                } label: {
-                    Label("Export…", systemImage: "square.and.arrow.up")
+                HStack(spacing: 8) {
+                    Button {
+                        model.beginAirDrop()
+                    } label: {
+                        Label {
+                            Text("AirDrop")
+                        } icon: {
+                            if let icon = AirDropService.airDropIcon {
+                                Image(nsImage: icon)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 14, height: 14)
+                            } else {
+                                Image(systemName: "paperplane")
+                            }
+                        }
+                    }
+                    .keyboardShortcut("a", modifiers: [.command, .shift])
+                    .disabled(model.plan == nil || model.plan?.resolvedCount == 0)
+                    .help("Send playlist package directly via AirDrop (Cmd+Shift+A)")
+
+                    Button {
+                        model.beginExport()
+                    } label: {
+                        Label("Save to Disk…", systemImage: "arrow.down.doc")
+                    }
+                    .keyboardShortcut("e")
+                    .buttonStyle(.borderedProminent)
+                    .disabled(model.plan == nil || model.plan?.resolvedCount == 0)
+                    .help("Save playlist package to disk (Cmd+E)")
                 }
-                .keyboardShortcut("e")
-                .buttonStyle(.borderedProminent)
-                .disabled(model.plan == nil || model.plan?.resolvedCount == 0)
             }
         }
     }
@@ -410,6 +433,16 @@ struct ExportBar: View {
                     ProgressView().controlSize(.small)
                 }
                 Text("\(progress.phase.rawValue): \(progress.message)").lineLimit(1).foregroundStyle(.secondary)
+            }
+        case .airDropping(let name):
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text("Sharing “\(name)” via AirDrop…").lineLimit(1).foregroundStyle(.secondary)
+            }
+        case .airDropFinished(let name):
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                Text("AirDropped “\(name)” · Temporary files cleared").lineLimit(1)
             }
         case .finished(let result):
             HStack(spacing: 8) {
