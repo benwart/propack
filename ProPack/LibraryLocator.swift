@@ -29,6 +29,7 @@ enum LibraryLocator {
         return [
             home.appending(path: "Documents/ProPresenter/Libraries", directoryHint: .isDirectory),
             home.appending(path: "Library/Application Support/RenewedVision/ProPresenter/Libraries", directoryHint: .isDirectory),
+            home.appending(path: "Library/Application Support/RenewedVision/ProPresenter/UserWorkspaces/ProPresenter/Libraries", directoryHint: .isDirectory),
         ]
     }
 

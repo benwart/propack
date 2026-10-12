@@ -64,6 +64,7 @@ nav:
       - Port Detection: specs/port-detection.md
       - Library Discovery: specs/library-discovery.md
       - Export & Packaging: specs/export-packaging.md
+      - Import Pipeline: specs/import-pipeline.md
       - REST API Reference: specs/api-reference.md
       - Building & Code Signing: specs/distribution-signing.md
   - Development & Contributing: development.md

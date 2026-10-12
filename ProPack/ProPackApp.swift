@@ -14,6 +14,13 @@ struct ProPackApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {}
             CommandGroup(replacing: .importExport) {
+                Button("Import Package…") {
+                    modelState.wrappedValue.choosePackageToImport()
+                }
+                .keyboardShortcut("i", modifiers: .command)
+
+                Divider()
+
                 Button("AirDrop Package…") {
                     modelState.wrappedValue.beginAirDrop()
                 }

@@ -24,6 +24,22 @@ final class AppModel {
         case failed(String)
     }
 
+    enum ImportState {
+        case idle
+        case inspecting
+        case ready(ImportPackage)
+        case importing(package: ImportPackage, progress: ImportProgress)
+        case finished(ImportResult)
+        case failed(String)
+
+        var isBusy: Bool {
+            switch self {
+            case .inspecting, .importing: true
+            default: false
+            }
+        }
+    }
+
     // Connection
     private(set) var connection: ConnectionState = .idle
     private(set) var connectedPort: Int?
@@ -48,14 +64,25 @@ final class AppModel {
     // Export
     private(set) var exportState: ExportState = .idle
 
+    // Import
+    var importState: ImportState = .idle
+    var isImportSheetPresented: Bool = false
+    var songConflictPolicy: SongConflictPolicy = .rename
+    var playlistConflictPolicy: PlaylistConflictPolicy = .keepBoth
+    var targetGroupName: String = ""
+    var groupConflictPolicy: GroupConflictPolicy = .useExisting
+    var selectedTargetLibraryURL: URL?
+
     private var planTask: Task<Void, Never>?
     private var exportTask: Task<Void, Never>?
+    private var importTask: Task<Void, Never>?
     private var currentAirDropTempDirectory: URL?
 
     private static let libraryBookmarkKey = "libraryBookmark"
 
     init() {
         AirDropService.purgeAllTemporaryFiles()
+        ImportService.purgeAllStagingDirectories()
         manualLibraryURL = Self.restoreLibraryBookmark()
     }
 
@@ -336,5 +363,109 @@ final class AppModel {
 
     func revealInFinder(_ url: URL) {
         NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    // MARK: - Import
+
+    var availableLibraries: [URL] {
+        var urls: [URL] = []
+        if let manual = manualLibraryURL { urls.append(manual) }
+        if let discovered = discoveredLibraryURL { urls.append(discovered) }
+        for root in LibraryLocator.defaultLibraryRoots {
+            if let children = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) {
+                for child in children {
+                    var isDir: ObjCBool = false
+                    if FileManager.default.fileExists(atPath: child.path, isDirectory: &isDir), isDir.boolValue {
+                        urls.append(child)
+                    }
+                }
+            } else if FileManager.default.fileExists(atPath: root.path) {
+                urls.append(root)
+            }
+        }
+        return LibraryLocator.normalizedRoots(urls)
+    }
+
+    func choosePackageToImport() {
+        let panel = NSOpenPanel()
+        panel.title = "Import ProPack Playlist Package"
+        panel.message = "Select a ProPack .zip package to import into ProPresenter."
+        panel.allowedContentTypes = [.zip]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        openPackageForImport(url: url)
+    }
+
+    func openPackageForImport(url: URL) {
+        importTask?.cancel()
+        importState = .inspecting
+        isImportSheetPresented = true
+
+        importTask = Task { [weak self] in
+            guard let self else { return }
+            let service = ImportService(client: self.client)
+            do {
+                let package = try await service.inspect(archiveURL: url)
+                guard !Task.isCancelled else { return }
+                self.importState = .ready(package)
+                if self.selectedTargetLibraryURL == nil {
+                    self.selectedTargetLibraryURL = self.availableLibraries.first
+                }
+            } catch is CancellationError {
+                self.importState = .idle
+                self.isImportSheetPresented = false
+            } catch {
+                self.importState = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    func startImport() {
+        guard case .ready(let package) = importState,
+              let targetLib = selectedTargetLibraryURL ?? availableLibraries.first else { return }
+
+        importState = .importing(package: package, progress: .init(phase: .copying, message: "Starting import…", fraction: 0))
+        let service = ImportService(client: self.client)
+
+        importTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let result = try await service.executeImport(
+                    package: package,
+                    targetLibraryURL: targetLib,
+                    songConflictPolicy: self.songConflictPolicy,
+                    playlistConflictPolicy: self.playlistConflictPolicy,
+                    targetGroupName: self.targetGroupName.isEmpty ? nil : self.targetGroupName,
+                    groupConflictPolicy: self.groupConflictPolicy
+                ) { progress in
+                    Task { @MainActor in
+                        self.importState = .importing(package: package, progress: progress)
+                    }
+                }
+                self.importState = .finished(result)
+                await self.reloadPlaylists()
+            } catch is CancellationError {
+                self.importState = .idle
+                self.isImportSheetPresented = false
+            } catch {
+                self.importState = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    func cancelImport() {
+        importTask?.cancel()
+        ImportService.purgeAllStagingDirectories()
+        importState = .idle
+        isImportSheetPresented = false
+    }
+
+    func dismissImportSheet() {
+        ImportService.purgeAllStagingDirectories()
+        importState = .idle
+        isImportSheetPresented = false
     }
 }

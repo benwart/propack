@@ -153,6 +153,52 @@ struct PPSlide: Codable, Hashable, Sendable {
     let label: String?
 }
 
+/// An entry in `GET /v1/libraries`.
+struct PPLibrary: Codable, Hashable, Identifiable, Sendable {
+    let uuid: String
+    let name: String
+    let index: Int?
+
+    var id: String { uuid }
+}
+
+/// Response from `GET /v1/library/{id}`.
+struct PPLibraryResponse: Codable, Sendable {
+    let updateType: String?
+    let items: [PPLibraryItem]
+}
+
+/// An entry in `GET /v1/library/{id}` items.
+struct PPLibraryItem: Codable, Hashable, Identifiable, Sendable {
+    let uuid: String
+    let name: String
+    let index: Int?
+
+    var id: String { uuid }
+}
+
+/// Payload sent in `PUT /v1/playlist/{id}` to set playlist items.
+struct PPPlaylistItemPayload: Encodable, Sendable {
+    struct IdentifierPayload: Encodable, Sendable {
+        let uuid: String
+        let name: String
+        let index: Int
+    }
+    struct PresentationInfoPayload: Encodable, Sendable {
+        let presentationUuid: String
+        let arrangementName: String
+        let arrangementUuid: String
+    }
+
+    let id: IdentifierPayload
+    let type: String
+    let isHidden: Bool
+    let isPco: Bool
+    let presentationInfo: PresentationInfoPayload?
+    let destination: String
+    let targetUuid: String
+}
+
 // MARK: - Errors
 
 enum ProPresenterClientError: LocalizedError {
@@ -232,17 +278,54 @@ struct ProPresenterClient: Sendable {
         return try decode(PPPresentation.self, from: data, path: path)
     }
 
+    func libraries() async throws -> [PPLibrary] {
+        let path = "/v1/libraries"
+        return try decode([PPLibrary].self, from: try await fetch(path), path: path)
+    }
+
+    func libraryItems(id: String) async throws -> [PPLibraryItem] {
+        let path = "/v1/library/\(Self.escape(id))"
+        let response = try decode(PPLibraryResponse.self, from: try await fetch(path), path: path)
+        return response.items
+    }
+
+    func createPlaylist(name: String, type: String = "playlist") async throws -> PPPlaylistNode {
+        struct CreateBody: Encodable {
+            let name: String
+            let type: String
+        }
+        let body = try JSONEncoder().encode(CreateBody(name: name, type: type))
+        let data = try await send(path: "/v1/playlists", method: "POST", body: body)
+        return try decode(PPPlaylistNode.self, from: data, path: "/v1/playlists")
+    }
+
+    func updatePlaylistItems(id: String, items: [PPPlaylistItemPayload]) async throws {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let body = try encoder.encode(items)
+        _ = try await send(path: "/v1/playlist/\(Self.escape(id))", method: "PUT", body: body)
+    }
+
     // MARK: Plumbing
 
     private var baseURL: URL? { URL(string: "http://\(host):\(port)") }
 
     private func fetch(_ path: String) async throws -> Data {
+        try await send(path: path, method: "GET", body: nil)
+    }
+
+    private func send(path: String, method: String, body: Data? = nil) async throws -> Data {
         guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else {
             throw ProPresenterClientError.invalidURL(path)
         }
         var request = URLRequest(url: url)
+        request.httpMethod = method
         request.timeoutInterval = timeout
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = body
+        }
 
         let data: Data
         let response: URLResponse

@@ -28,6 +28,14 @@ struct ContentView: View {
                 }
                 .help("Connection settings")
             }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    model.choosePackageToImport()
+                } label: {
+                    Label("Import…", systemImage: "square.and.arrow.down")
+                }
+                .help("Import a ProPack package into ProPresenter (Cmd+I)")
+            }
         }
         .sheet(isPresented: showConnectionSheetState.projectedValue) {
             VStack(spacing: 0) {
@@ -40,6 +48,31 @@ struct ContentView: View {
                 .padding()
             }
             .frame(width: 560, height: 600)
+        }
+        .sheet(isPresented: Binding(
+            get: { model.isImportSheetPresented },
+            set: { model.isImportSheetPresented = $0 }
+        )) {
+            ImportSheetView()
+        }
+        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+            guard let provider = providers.first else { return false }
+            provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, _ in
+                let url: URL?
+                if let u = item as? URL {
+                    url = u
+                } else if let data = item as? Data {
+                    url = URL(dataRepresentation: data, relativeTo: nil)
+                } else {
+                    url = nil
+                }
+                if let url, url.pathExtension.lowercased() == "zip" {
+                    Task { @MainActor in
+                        model.openPackageForImport(url: url)
+                    }
+                }
+            }
+            return true
         }
         .task {
             if let detected = await model.connectOnLaunch(savedPort: port) { port = detected }

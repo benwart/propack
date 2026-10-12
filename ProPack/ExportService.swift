@@ -304,30 +304,30 @@ struct ExportService: Sendable {
 // MARK: - Manifest
 
 /// Serialized as `manifest.json` (snake_case keys).
-struct Manifest: Encodable {
-    struct Generator: Encodable {
+struct Manifest: Codable, Sendable {
+    struct Generator: Codable, Sendable {
         let name: String
         let version: String
     }
 
-    struct Source: Encodable {
+    struct Source: Codable, Sendable {
         let hostDescription: String?
         let apiVersion: String?
         let platform: String?
         let osVersion: String?
     }
 
-    struct Playlist: Encodable {
+    struct Playlist: Codable, Sendable {
         let uuid: String
         let name: String
     }
 
-    struct Arrangement: Encodable {
+    struct Arrangement: Codable, Sendable {
         let uuid: String?
         let name: String?
     }
 
-    struct FileInfo: Encodable {
+    struct FileInfo: Codable, Sendable {
         let packagePath: String
         let sourcePath: String
         let sizeBytes: Int
@@ -335,15 +335,15 @@ struct Manifest: Encodable {
         let modifiedAt: Date?
     }
 
-    struct Group: Encodable {
+    struct Group: Codable, Sendable {
         let name: String?
         let color: PPColor?
         let slideCount: Int
         let slideLabels: [String]
     }
 
-    struct Item: Encodable {
-        enum Status: String, Encodable {
+    struct Item: Codable, Sendable {
+        enum Status: String, Codable, Sendable {
             case included, missing, skipped
         }
 
@@ -362,7 +362,7 @@ struct Manifest: Encodable {
         let error: String?
     }
 
-    struct Summary: Encodable {
+    struct Summary: Codable, Sendable {
         let totalItems: Int
         let presentations: Int
         let included: Int
@@ -370,8 +370,8 @@ struct Manifest: Encodable {
         let uniqueFiles: Int
     }
 
-    let format = "propack"
-    let formatVersion = ExportService.manifestFormatVersion
+    var format: String = "propack"
+    var formatVersion: Int = ExportService.manifestFormatVersion
     let exportedAt: Date
     let generator: Generator
     let source: Source?
