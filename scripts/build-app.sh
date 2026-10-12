@@ -40,10 +40,10 @@ fi
 echo "==> Bundling offline Help documentation..."
 HELP_DIR="${RESOURCES_DIR}/Help"
 mkdir -p "${HELP_DIR}"
-if command -v uv >/dev/null 2>&1; then
-    uv run --group docs mkdocs build --strict -d "${HELP_DIR}"
-elif [ -d "${PROJECT_DIR}/site" ]; then
+if [ -d "${PROJECT_DIR}/site" ]; then
     cp -R "${PROJECT_DIR}/site/"* "${HELP_DIR}/"
+elif command -v uv >/dev/null 2>&1; then
+    uv run --group docs mkdocs build --strict -d "${HELP_DIR}" || true
 fi
 
 # 4. Resolve App Version

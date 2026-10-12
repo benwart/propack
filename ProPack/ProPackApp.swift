@@ -72,6 +72,10 @@ struct ProPackApp: App {
                 .frame(minWidth: 780, minHeight: 520)
         }
         .defaultSize(width: 920, height: 660)
+
+        Settings {
+            SettingsView()
+        }
     }
 }
 
