@@ -255,10 +255,10 @@ struct ExportService: Sendable {
         return cleaned.isEmpty ? "Playlist" : cleaned
     }
 
-    static func suggestedArchiveName(for playlistName: String, date: Date = Date()) -> String {
+    static func suggestedArchiveName(for playlistName: String, date: Date = Date(), fileExtension: String = "propack") -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        return "\(sanitizedFileName(playlistName)) \(formatter.string(from: date)).zip"
+        return "\(sanitizedFileName(playlistName)) \(formatter.string(from: date)).\(fileExtension)"
     }
 
     /// Path relative to its library root (e.g. `Default/Amazing Grace.pro`), or just the file name.

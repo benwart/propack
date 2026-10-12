@@ -66,7 +66,7 @@ struct ContentView: View {
                 } else {
                     url = nil
                 }
-                if let url, url.pathExtension.lowercased() == "zip" {
+                if let url, ["propack", "zip"].contains(url.pathExtension.lowercased()) {
                     Task { @MainActor in
                         model.openPackageForImport(url: url)
                     }

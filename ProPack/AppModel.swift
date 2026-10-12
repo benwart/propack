@@ -1,5 +1,6 @@
 import AppKit
 import Observation
+import UniformTypeIdentifiers
 
 @MainActor
 @Observable
@@ -257,7 +258,8 @@ final class AppModel {
 
         let panel = NSSavePanel()
         panel.title = "Export Playlist Package"
-        panel.allowedContentTypes = [.zip]
+        let propackType = UTType(filenameExtension: "propack") ?? .data
+        panel.allowedContentTypes = [propackType, .zip]
         panel.canCreateDirectories = true
         panel.nameFieldStringValue = ExportService.suggestedArchiveName(for: plan.playlist.name)
         guard panel.runModal() == .OK, let destination = panel.url else { return }
@@ -389,8 +391,9 @@ final class AppModel {
     func choosePackageToImport() {
         let panel = NSOpenPanel()
         panel.title = "Import ProPack Playlist Package"
-        panel.message = "Select a ProPack .zip package to import into ProPresenter."
-        panel.allowedContentTypes = [.zip]
+        panel.message = "Select a ProPack package (.propack or .zip) to import into ProPresenter."
+        let propackType = UTType(filenameExtension: "propack") ?? .data
+        panel.allowedContentTypes = [propackType, .zip]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.canChooseFiles = true

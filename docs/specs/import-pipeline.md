@@ -90,3 +90,21 @@ ProPack provides fine-grained control over how collisions with existing local fi
 - All temporary unzipped files are stored in `FileManager.default.temporaryDirectory/ProPack/ImportStaging/<UUID>/`.
 - The staging directory is unlinked automatically via `defer` when import finishes or when cancelled.
 - `ImportService.purgeAllStagingDirectories()` runs on application startup to ensure no orphaned files persist across restarts.
+
+---
+
+## 5. Return AirDrop & Custom File Association (`.propack`)
+
+To enable transferring packages back to a Mac and having macOS automatically route the transfer to ProPack:
+
+### Why a Custom Extension is Required
+- Generic `.zip` files are claimed by macOS `Archive Utility` and deposited into `~/Downloads` without notifying third-party apps.
+- By registering a dedicated Uniform Type Identifier (`com.benwart.propack.package`) bound to `.propack`:
+  - macOS recognizes `ProPack.app` as the registered owner.
+  - When a `.propack` file is received via AirDrop, macOS prompts to open with ProPack or launches it directly.
+  - Double-clicking any `.propack` file in Finder immediately opens the ProPack Import Sheet.
+
+### File Format Compatibility
+- Internally, a `.propack` package **is** a standard PKZip archive containing `manifest.json` and `Presentations/`.
+- Renaming between `.propack` and `.zip` works transparently with any standard zip utility.
+- ProPack supports exporting, AirDropping, and importing both `.propack` and `.zip` files.

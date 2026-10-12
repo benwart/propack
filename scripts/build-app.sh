@@ -72,6 +72,54 @@ cat << 'EOF' > "${CONTENTS_DIR}/Info.plist"
     </dict>
     <key>NSDocumentsFolderUsageDescription</key>
     <string>ProPack reads ProPresenter presentation files from your Documents folder to include them in exported playlist packages.</string>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>ProPack Playlist Package</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>LSHandlerRank</key>
+            <string>Owner</string>
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.benwart.propack.package</string>
+            </array>
+            <key>CFBundleTypeIconFile</key>
+            <string>AppIcon</string>
+        </dict>
+    </array>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>com.benwart.propack.package</string>
+            <key>UTTypeDescription</key>
+            <string>ProPack Playlist Package</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+                <string>public.archive</string>
+                <string>com.pkware.zip-archive</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>propack</string>
+                </array>
+                <key>public.mime-type</key>
+                <array>
+                    <string>application/x-propack</string>
+                </array>
+            </dict>
+            <key>UTTypeIcons</key>
+            <dict>
+                <key>UTTypeIconBadgeName</key>
+                <string>AppIcon</string>
+            </dict>
+        </dict>
+    </array>
 </dict>
 </plist>
 EOF
