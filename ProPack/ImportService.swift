@@ -120,6 +120,10 @@ struct ImportResult: Sendable {
 struct ImportService: Sendable {
     let client: ProPresenterClient?
 
+    init(client: ProPresenterClient? = nil) {
+        self.client = client
+    }
+
     static var stagingBaseDirectory: URL {
         FileManager.default.temporaryDirectory
             .appending(path: "ProPack", directoryHint: .isDirectory)

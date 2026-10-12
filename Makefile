@@ -8,9 +8,13 @@ SIGNING_IDENTITY ?= -
 APP_VERSION ?= $(shell node scripts/get-version.js 2>/dev/null || echo 0.1.0)
 DMG_PATH = $(DIST_DIR)/$(APP_NAME)-$(APP_VERSION).dmg
 
-.PHONY: all app dmg run clean install uninstall help docs docs-serve release release-dry version
+.PHONY: all app dmg test run clean install uninstall help docs docs-serve release release-dry version
 
 all: app
+
+## test: Compile and run the automated unit test suite
+test:
+	@./scripts/run-tests.sh
 
 ## app: Build and code-sign the standalone ProPack.app bundle
 app:

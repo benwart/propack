@@ -101,6 +101,14 @@ struct PPPlaylistItem: Decodable, Hashable, Identifiable, Sendable {
         case type, isHidden, isPco, presentationInfo
     }
 
+    init(identifier: PPIdentifier, type: String? = nil, isHidden: Bool? = nil, isPco: Bool? = nil, presentationInfo: PPPresentationInfo? = nil) {
+        self.identifier = identifier
+        self.type = type
+        self.isHidden = isHidden
+        self.isPco = isPco
+        self.presentationInfo = presentationInfo
+    }
+
     var id: String { identifier.uuid }
     var name: String { identifier.name }
     var kind: String { type ?? "unknown" }
@@ -131,12 +139,26 @@ struct PPPresentation: Decodable, Sendable {
         case identifier = "id"
         case groups, hasTimeline, presentationPath, destination
     }
+
+    init(identifier: PPIdentifier, groups: [PPGroup]? = nil, hasTimeline: Bool? = nil, presentationPath: String? = nil, destination: String? = nil) {
+        self.identifier = identifier
+        self.groups = groups
+        self.hasTimeline = hasTimeline
+        self.presentationPath = presentationPath
+        self.destination = destination
+    }
 }
 
 struct PPGroup: Codable, Hashable, Sendable {
     let name: String?
     let color: PPColor?
     let slides: [PPSlide]?
+
+    init(name: String? = nil, color: PPColor? = nil, slides: [PPSlide]? = nil) {
+        self.name = name
+        self.color = color
+        self.slides = slides
+    }
 }
 
 struct PPColor: Codable, Hashable, Sendable {
@@ -151,6 +173,13 @@ struct PPSlide: Codable, Hashable, Sendable {
     let notes: String?
     let text: String?
     let label: String?
+
+    init(enabled: Bool? = true, notes: String? = nil, text: String? = nil, label: String? = nil) {
+        self.enabled = enabled
+        self.notes = notes
+        self.text = text
+        self.label = label
+    }
 }
 
 /// An entry in `GET /v1/libraries`.

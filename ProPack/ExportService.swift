@@ -88,6 +88,11 @@ struct ExportService: Sendable {
     /// Extra roots to search (user-picked folder first). Defaults are appended automatically.
     var additionalLibraryRoots: [URL] = []
 
+    init(client: ProPresenterClient = ProPresenterClient(port: 0), additionalLibraryRoots: [URL] = []) {
+        self.client = client
+        self.additionalLibraryRoots = additionalLibraryRoots
+    }
+
     // MARK: Prepare
 
     func prepare(playlistID: String, progress: ProgressHandler? = nil) async throws -> ExportPlan {
