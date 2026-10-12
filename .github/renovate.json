@@ -22,11 +22,11 @@
     },
     {
       "description": "Group semantic-release ecosystem packages",
-      "matchPackagePatterns": [
-        "^@?semantic-release"
-      ],
       "groupName": "semantic-release plugins",
-      "automerge": false
+      "automerge": false,
+      "matchPackageNames": [
+        "/^@?semantic-release/"
+      ]
     },
     {
       "description": "Group documentation Python dependencies",
