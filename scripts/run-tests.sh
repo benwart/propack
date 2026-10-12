@@ -11,7 +11,7 @@ mkdir -p "${BUILD_DIR}" "${MODCACHE_DIR}"
 
 echo "==> Compiling ProPack unit test suite..."
 swiftc \
-    -swift-version 6 \
+    -swift-version 5 \
     -target arm64-apple-macos14.0 \
     -module-cache-path "${MODCACHE_DIR}" \
     -O \

@@ -93,7 +93,7 @@ final class TransferHistoryStore: ObservableObject {
     private let storageURL: URL
     private let maxRecords: Int
 
-    static var defaultStorageURL: URL {
+    nonisolated static var defaultStorageURL: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return appSupport
             .appending(path: "com.benwart.propack", directoryHint: .isDirectory)

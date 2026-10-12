@@ -16,8 +16,45 @@ permissions:
   pull-requests: write
 
 jobs:
+  test-and-build:
+    name: Verify Tests & Build
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup uv for Python docs
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build offline documentation
+        run: uv run --group docs mkdocs build
+
+      - name: Run unit test suite
+        run: make test
+
+      - name: Build ProPack.app bundle
+        run: make app
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Build DMG installer
+        run: make dmg
+
   release:
     name: Semantic Release
+    needs: test-and-build
     runs-on: macos-14
     steps:
       - name: Checkout code
@@ -39,6 +76,9 @@ jobs:
 
       - name: Install Node dependencies
         run: npm ci
+
+      - name: Build offline documentation
+        run: uv run --group docs mkdocs build
 
       - name: Install create-dmg
         run: brew install create-dmg

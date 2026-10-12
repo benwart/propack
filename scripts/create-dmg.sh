@@ -41,7 +41,7 @@ if [ ! -f "${BG_TIFF}" ] || [ ! -f "${BG_PNG}" ]; then
     echo "==> Generating branded DMG background assets..."
     mkdir -p "${PROJECT_DIR}/.build/modcache"
     swiftc \
-        -swift-version 6 \
+        -swift-version 5 \
         -target arm64-apple-macos14.0 \
         -module-cache-path "${PROJECT_DIR}/.build/modcache" \
         -o "${PROJECT_DIR}/.build/gen-dmg-bg" \

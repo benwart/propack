@@ -20,9 +20,9 @@ rm -rf "${APP_BUNDLE}"
 mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}" "${MODCACHE_DIR}"
 
 # 1. Compile Swift executable
-echo "==> Compiling Swift sources (macOS 14.0+ target, Swift 6)..."
+echo "==> Compiling Swift sources (macOS 14.0+ target, Swift 5)..."
 swiftc \
-    -swift-version 6 \
+    -swift-version 5 \
     -target arm64-apple-macos14.0 \
     -parse-as-library \
     -O \
