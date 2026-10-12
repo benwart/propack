@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/benwart/propack/compare/v1.0.0...v1.0.1) (2026-10-12)
+
+### Bug Fixes
+
+* **concurrency:** resolve nonisolated WKNavigationDelegate requirement in HelpNavDelegate ([923f587](https://github.com/benwart/propack/commit/923f58701c158d4699567d1c8f07acf3e688019f))
+
 ## 1.0.0 (2026-10-12)
 
 ### Features

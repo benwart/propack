@@ -1,6 +1,6 @@
 {
   "name": "propack",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "ProPresenter Playlist Pack Exporter (macOS Native)",
   "scripts": {
