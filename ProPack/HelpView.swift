@@ -66,6 +66,7 @@ final class HelpNavigationState: ObservableObject {
     }
 }
 
+@MainActor
 final class HelpNavDelegate: NSObject, WKNavigationDelegate {
     let state: HelpNavigationState
 
@@ -85,6 +86,7 @@ final class HelpNavDelegate: NSObject, WKNavigationDelegate {
 
 // MARK: - Web View
 
+@MainActor
 struct HelpWebView: NSViewRepresentable {
     let state: HelpNavigationState
 

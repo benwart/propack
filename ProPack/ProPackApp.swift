@@ -79,6 +79,7 @@ struct ProPackApp: App {
     }
 }
 
+@MainActor
 private struct HelpMenuCommands: View {
     @Environment(\.openWindow) private var openWindow
 
