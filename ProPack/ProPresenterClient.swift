@@ -228,6 +228,109 @@ struct PPPlaylistItemPayload: Encodable, Sendable {
     let targetUuid: String
 }
 
+/// Summary of a ProPresenter Audience Look (`GET /v1/look/current` or `GET /v1/looks`),
+/// including any alternate presentation themes referenced across its screens/layers.
+struct PPLookSummary: Codable, Hashable, Identifiable, Sendable {
+    let identifier: PPIdentifier
+    let isLive: Bool
+    let referencedThemes: [PPIdentifier]
+    let rawJSONBase64: String?
+
+    var id: String { identifier.uuid }
+    var name: String { identifier.name }
+
+    init(
+        identifier: PPIdentifier,
+        isLive: Bool = false,
+        referencedThemes: [PPIdentifier] = [],
+        rawJSONBase64: String? = nil
+    ) {
+        self.identifier = identifier
+        self.isLive = isLive
+        self.referencedThemes = referencedThemes
+        self.rawJSONBase64 = rawJSONBase64
+    }
+
+    /// Parses a single Audience Look JSON payload from `/v1/look/current` or `/v1/look/{id}`.
+    static func parse(from data: Data, isLive: Bool = false) -> PPLookSummary? {
+        guard let root = try? JSONSerialization.jsonObject(with: data) else { return nil }
+        if let dict = root as? [String: Any] {
+            let lookDict = (dict["look"] as? [String: Any]) ?? dict
+            return parseDictionary(lookDict, isLive: isLive)
+        }
+        return nil
+    }
+
+    /// Parses a list of Audience Looks from `/v1/looks`.
+    static func parseList(from data: Data) -> [PPLookSummary] {
+        guard let root = try? JSONSerialization.jsonObject(with: data) else { return [] }
+        let array: [[String: Any]]
+        if let list = root as? [[String: Any]] {
+            array = list
+        } else if let dict = root as? [String: Any], let list = dict["looks"] as? [[String: Any]] {
+            array = list
+        } else {
+            return []
+        }
+        return array.compactMap { parseDictionary($0, isLive: false) }
+    }
+
+    private static func parseDictionary(_ dict: [String: Any], isLive: Bool) -> PPLookSummary? {
+        let idDict = (dict["id"] as? [String: Any]) ?? dict
+        let uuid = (idDict["uuid"] as? String) ?? ""
+        let name = (idDict["name"] as? String) ?? (dict["name"] as? String) ?? (isLive ? "Live Look" : "")
+        let index = idDict["index"] as? Int
+        guard !uuid.isEmpty || !name.isEmpty else { return nil }
+
+        var themes: [PPIdentifier] = []
+        var seen = Set<String>()
+        extractThemes(from: dict, into: &themes, seen: &seen)
+
+        let rawBase64 = (try? JSONSerialization.data(withJSONObject: dict)).map { $0.base64EncodedString() }
+        return PPLookSummary(
+            identifier: PPIdentifier(uuid: uuid.isEmpty ? name : uuid, name: name, index: index),
+            isLive: isLive,
+            referencedThemes: themes,
+            rawJSONBase64: rawBase64
+        )
+    }
+
+    private static func extractThemes(from value: Any, into results: inout [PPIdentifier], seen: inout Set<String>) {
+        if let dict = value as? [String: Any] {
+            for (key, child) in dict {
+                let lowerKey = key.lowercased()
+                if lowerKey == "presentation_theme" || lowerKey == "presentationtheme" || lowerKey == "theme" || lowerKey == "template" {
+                    if let themeDict = child as? [String: Any] {
+                        let idContainer = (themeDict["id"] as? [String: Any]) ?? themeDict
+                        let uuid = (idContainer["uuid"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                        let name = (idContainer["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                        let index = idContainer["index"] as? Int
+                        if !uuid.isEmpty || !name.isEmpty {
+                            let dedupKey = "\(uuid.lowercased())|\(name.lowercased())"
+                            if seen.insert(dedupKey).inserted {
+                                results.append(PPIdentifier(uuid: uuid, name: name, index: index))
+                            }
+                        }
+                    } else if let themeName = child as? String {
+                        let trimmed = themeName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !trimmed.isEmpty {
+                            let dedupKey = "|\(trimmed.lowercased())"
+                            if seen.insert(dedupKey).inserted {
+                                results.append(PPIdentifier(uuid: "", name: trimmed, index: nil))
+                            }
+                        }
+                    }
+                }
+                extractThemes(from: child, into: &results, seen: &seen)
+            }
+        } else if let array = value as? [Any] {
+            for element in array {
+                extractThemes(from: element, into: &results, seen: &seen)
+            }
+        }
+    }
+}
+
 // MARK: - Errors
 
 enum ProPresenterClientError: LocalizedError {
@@ -333,6 +436,40 @@ struct ProPresenterClient: Sendable {
         encoder.keyEncodingStrategy = .convertToSnakeCase
         let body = try encoder.encode(items)
         _ = try await send(path: "/v1/playlist/\(Self.escape(id))", method: "PUT", body: body)
+    }
+
+    func currentLook() async throws -> PPLookSummary {
+        let path = "/v1/look/current"
+        let data = try await fetch(path)
+        guard let look = PPLookSummary.parse(from: data, isLive: true) else {
+            throw ProPresenterClientError.decoding(path: path, detail: "Invalid Look JSON payload")
+        }
+        return look
+    }
+
+    func looks() async throws -> [PPLookSummary] {
+        let path = "/v1/looks"
+        let data = try await fetch(path)
+        return PPLookSummary.parseList(from: data)
+    }
+
+    func syncAudienceLook(_ look: PPLookSummary) async {
+        guard let rawBase64 = look.rawJSONBase64,
+              let rawData = Data(base64Encoded: rawBase64) else { return }
+
+        if look.isLive {
+            _ = try? await send(path: "/v1/look/current", method: "PUT", body: rawData)
+        } else {
+            let existing = (try? await looks()) ?? []
+            if let match = existing.first(where: {
+                $0.id.caseInsensitiveCompare(look.id) == .orderedSame ||
+                $0.name.localizedCaseInsensitiveCompare(look.name) == .orderedSame
+            }) {
+                _ = try? await send(path: "/v1/look/\(Self.escape(match.id))", method: "PUT", body: rawData)
+            } else {
+                _ = try? await send(path: "/v1/looks", method: "POST", body: rawData)
+            }
+        }
     }
 
     // MARK: Plumbing

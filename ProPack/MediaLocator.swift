@@ -34,13 +34,27 @@ public struct MediaAsset: Identifiable, Hashable, Sendable, Codable {
 
 public enum MediaLocator {
     public static var defaultMediaRoots: [URL] {
+        var roots: [URL] = []
+        for workspace in LibraryLocator.detectedWorkspaceDirectories {
+            let mediaDir = workspace.appending(path: "Media", directoryHint: .isDirectory)
+            roots.append(mediaDir)
+            roots.append(mediaDir.appending(path: "Assets", directoryHint: .isDirectory))
+            roots.append(mediaDir.appending(path: "Imported", directoryHint: .isDirectory))
+        }
         let home = FileManager.default.homeDirectoryForCurrentUser
-        return [
+        roots.append(contentsOf: [
             home.appending(path: "Documents/ProPresenter/Media", directoryHint: .isDirectory),
             home.appending(path: "Movies", directoryHint: .isDirectory),
             home.appending(path: "Pictures", directoryHint: .isDirectory),
             home.appending(path: "Music", directoryHint: .isDirectory)
-        ]
+        ])
+        return roots
+    }
+
+    /// Infers the target `Media` directory corresponding to a target library folder on import.
+    public static func targetMediaDirectory(forTargetLibraryURL targetLibraryURL: URL) -> URL {
+        let workspace = LibraryLocator.workspaceDirectory(forTargetLibraryURL: targetLibraryURL)
+        return workspace.appending(path: "Media", directoryHint: .isDirectory)
     }
 
     /// Extracts referenced media files from an array of .pro files.
