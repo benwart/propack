@@ -10,6 +10,7 @@ func main() async {
     await runManifestTests()
     await runConflictResolutionTests()
     await runMediaLocatorTests()
+    await runThemeAndFontLocatorTests()
     await runTransferHistoryTests()
     await runZipRoundtripTests()
 
