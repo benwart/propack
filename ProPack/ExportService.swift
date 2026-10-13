@@ -21,6 +21,9 @@ struct ExportPlan: Sendable {
     let proPresenter: PPVersion?
     let entries: [Entry]
     let referencedMedia: [MediaAsset]
+    let referencedThemes: [ThemeAsset]
+    let referencedFonts: [FontAsset]
+    let audienceLooks: [PPLookSummary]
     let libraryRoots: [URL]
     /// Library folder inferred from an API `presentation_path`, if any.
     let discoveredLibraryRoot: URL?
@@ -31,6 +34,9 @@ struct ExportPlan: Sendable {
         proPresenter: PPVersion?,
         entries: [Entry],
         referencedMedia: [MediaAsset] = [],
+        referencedThemes: [ThemeAsset] = [],
+        referencedFonts: [FontAsset] = [],
+        audienceLooks: [PPLookSummary] = [],
         libraryRoots: [URL],
         discoveredLibraryRoot: URL?,
         preparedAt: Date
@@ -39,6 +45,9 @@ struct ExportPlan: Sendable {
         self.proPresenter = proPresenter
         self.entries = entries
         self.referencedMedia = referencedMedia
+        self.referencedThemes = referencedThemes
+        self.referencedFonts = referencedFonts
+        self.audienceLooks = audienceLooks
         self.libraryRoots = libraryRoots
         self.discoveredLibraryRoot = discoveredLibraryRoot
         self.preparedAt = preparedAt
@@ -49,6 +58,10 @@ struct ExportPlan: Sendable {
     var missingCount: Int { presentationEntries.count - resolvedCount }
     var totalMediaSizeBytes: Int64 { referencedMedia.reduce(0) { $0 + $1.sizeBytes } }
     var formattedMediaSize: String { ByteCountFormatter.string(fromByteCount: totalMediaSizeBytes, countStyle: .file) }
+    var totalThemeSizeBytes: Int64 { referencedThemes.reduce(0) { $0 + $1.sizeBytes } }
+    var formattedThemeSize: String { ByteCountFormatter.string(fromByteCount: totalThemeSizeBytes, countStyle: .file) }
+    var totalFontSizeBytes: Int64 { referencedFonts.reduce(0) { $0 + $1.sizeBytes } }
+    var formattedFontSize: String { ByteCountFormatter.string(fromByteCount: totalFontSizeBytes, countStyle: .file) }
 }
 
 // MARK: - Progress
@@ -76,7 +89,25 @@ struct ExportResult: Sendable {
     let archiveURL: URL
     let includedFiles: Int
     let includedMediaFiles: Int
+    let includedThemeFiles: Int
+    let includedFontFiles: Int
     let missingPresentations: [String]
+
+    init(
+        archiveURL: URL,
+        includedFiles: Int,
+        includedMediaFiles: Int = 0,
+        includedThemeFiles: Int = 0,
+        includedFontFiles: Int = 0,
+        missingPresentations: [String] = []
+    ) {
+        self.archiveURL = archiveURL
+        self.includedFiles = includedFiles
+        self.includedMediaFiles = includedMediaFiles
+        self.includedThemeFiles = includedThemeFiles
+        self.includedFontFiles = includedFontFiles
+        self.missingPresentations = missingPresentations
+    }
 }
 
 enum ExportError: LocalizedError {
@@ -104,6 +135,9 @@ enum ExportError: LocalizedError {
 struct ExportService: Sendable {
     static let manifestFileName = "manifest.json"
     static let presentationsFolder = "Presentations"
+    static let mediaFolder = "Media"
+    static let themesFolder = "Themes"
+    static let fontsFolder = "Fonts"
     static let manifestFormatVersion = 1
 
     let client: ProPresenterClient
@@ -120,6 +154,8 @@ struct ExportService: Sendable {
     func prepare(playlistID: String, progress: ProgressHandler? = nil) async throws -> ExportPlan {
         progress?(.init(phase: .fetching, message: "Loading playlist…", fraction: nil))
         async let versionTask = try? client.version()
+        async let currentLookTask = try? client.currentLook()
+        async let allLooksTask = try? client.looks()
         let detail = try await client.playlist(id: playlistID)
 
         let presentationItems = detail.presentationItems
@@ -179,7 +215,27 @@ struct ExportService: Sendable {
         try Task.checkCancellation()
 
         let uniqueSources = Self.orderedUnique(matches.values.map(\.url))
-        let referencedMedia = MediaLocator.findReferencedMedia(inProFiles: uniqueSources)
+        let currentLook = await currentLookTask
+        let allLooks = (await allLooksTask) ?? []
+
+        let (audienceLooks, referencedThemes, referencedMedia, referencedFonts) = await Task.detached(priority: .userInitiated) {
+            let relevantLooks = ThemeLocator.relevantAudienceLooks(
+                currentLook: currentLook,
+                allLooks: allLooks,
+                inProFiles: uniqueSources
+            )
+            let themeRoots = ThemeLocator.defaultThemeRoots(forLibraryRoots: roots)
+            let themes = ThemeLocator.findReferencedThemes(
+                inProFiles: uniqueSources,
+                audienceLooks: relevantLooks,
+                themeRoots: themeRoots
+            )
+            let allContentFiles = uniqueSources + themes.map(\.url)
+            let media = MediaLocator.findReferencedMedia(inProFiles: allContentFiles)
+            let fonts = FontLocator.findReferencedFonts(inFiles: allContentFiles)
+            return (relevantLooks, themes, media, fonts)
+        }.value
+        try Task.checkCancellation()
 
         let entries = detail.items.map { item -> ExportPlan.Entry in
             let uuid = item.presentationInfo?.presentationUuid
@@ -196,6 +252,9 @@ struct ExportService: Sendable {
             proPresenter: await versionTask,
             entries: entries,
             referencedMedia: referencedMedia,
+            referencedThemes: referencedThemes,
+            referencedFonts: referencedFonts,
+            audienceLooks: audienceLooks,
             libraryRoots: roots,
             discoveredLibraryRoot: discoveredRoot,
             preparedAt: Date()
@@ -204,10 +263,15 @@ struct ExportService: Sendable {
 
     // MARK: Export
 
-    static let mediaFolder = "Media"
-
     /// Stages files + `manifest.json` in a temp folder and zips it to `destination` with `ditto`.
-    func export(plan: ExportPlan, to destination: URL, includeMedia: Bool = false, progress: ProgressHandler? = nil) async throws -> ExportResult {
+    func export(
+        plan: ExportPlan,
+        to destination: URL,
+        includeMedia: Bool = false,
+        includeThemes: Bool = true,
+        includeFonts: Bool = true,
+        progress: ProgressHandler? = nil
+    ) async throws -> ExportResult {
         let presentationEntries = plan.presentationEntries
         guard !presentationEntries.isEmpty else { throw ExportError.noPresentations }
         let missing = presentationEntries.filter { $0.match == nil }.map(\.item.name)
@@ -277,8 +341,86 @@ struct ExportService: Sendable {
             }
         }
 
-        // 3. manifest.json
-        let manifest = Manifest(plan: plan, files: fileInfo, media: mediaFileInfo)
+        // 3. Theme files (if requested and present)
+        var themeFileInfo: [Manifest.FileInfo] = []
+        if includeThemes && !plan.referencedThemes.isEmpty {
+            var usedThemePaths = Set<String>()
+            do {
+                try fm.createDirectory(at: packageDir.appending(path: Self.themesFolder), withIntermediateDirectories: true)
+                for (index, theme) in plan.referencedThemes.enumerated() {
+                    try Task.checkCancellation()
+                    progress?(.init(
+                        phase: .staging,
+                        message: "Copying theme: \(theme.themeName)",
+                        fraction: Double(index) / Double(plan.referencedThemes.count)
+                    ))
+                    let relative = Self.uniquePath(
+                        "\(Self.themesFolder)/\(theme.relativePath)",
+                        used: &usedThemePaths
+                    )
+                    let target = packageDir.appending(path: relative)
+                    try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    if !fm.fileExists(atPath: target.path) {
+                        try fm.copyItem(at: theme.url, to: target)
+                    }
+                    // If this theme is in ProPresenter 22+ folder format (`Themes/<ThemeName>/Theme`), copy sibling `Assets/` folder if present
+                    if theme.url.lastPathComponent.localizedCaseInsensitiveCompare("Theme") == .orderedSame {
+                        let sourceAssetsDir = theme.url.deletingLastPathComponent().appending(path: "Assets", directoryHint: .isDirectory)
+                        let targetAssetsDir = target.deletingLastPathComponent().appending(path: "Assets", directoryHint: .isDirectory)
+                        var isDir: ObjCBool = false
+                        if fm.fileExists(atPath: sourceAssetsDir.path, isDirectory: &isDir), isDir.boolValue,
+                           !fm.fileExists(atPath: targetAssetsDir.path) {
+                            try? fm.copyItem(at: sourceAssetsDir, to: targetAssetsDir)
+                        }
+                    }
+                    if let info = try? Self.fileInfo(packagePath: relative, source: theme.url, copy: target) {
+                        themeFileInfo.append(info)
+                    }
+                }
+            } catch let error as CancellationError {
+                throw error
+            } catch {
+                throw ExportError.staging("Themes: \(error.localizedDescription)")
+            }
+        }
+
+        // 4. Font files (if requested and present)
+        var fontFileInfo: [Manifest.FileInfo] = []
+        if includeFonts && !plan.referencedFonts.isEmpty {
+            do {
+                try fm.createDirectory(at: packageDir.appending(path: Self.fontsFolder), withIntermediateDirectories: true)
+                for (index, font) in plan.referencedFonts.enumerated() {
+                    try Task.checkCancellation()
+                    progress?(.init(
+                        phase: .staging,
+                        message: "Copying font: \(font.filename)",
+                        fraction: Double(index) / Double(plan.referencedFonts.count)
+                    ))
+                    let relative = "\(Self.fontsFolder)/\(font.filename)"
+                    let target = packageDir.appending(path: relative)
+                    if !fm.fileExists(atPath: target.path) {
+                        try fm.copyItem(at: font.url, to: target)
+                    }
+                    if let info = try? Self.fileInfo(packagePath: relative, source: font.url, copy: target) {
+                        fontFileInfo.append(info)
+                    }
+                }
+            } catch let error as CancellationError {
+                throw error
+            } catch {
+                throw ExportError.staging("Fonts: \(error.localizedDescription)")
+            }
+        }
+
+        // 5. manifest.json
+        let manifest = Manifest(
+            plan: plan,
+            files: fileInfo,
+            media: mediaFileInfo,
+            themes: themeFileInfo,
+            fonts: fontFileInfo,
+            includeAudienceLooks: includeThemes
+        )
         do {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
@@ -289,7 +431,7 @@ struct ExportService: Sendable {
             throw ExportError.staging("manifest.json: \(error.localizedDescription)")
         }
 
-        // 4. Compress. --keepParent puts everything under a single top-level folder in the archive.
+        // 6. Compress. --keepParent puts everything under a single top-level folder in the archive.
         try Task.checkCancellation()
         progress?(.init(phase: .compressing, message: "Creating \(destination.lastPathComponent)…", fraction: nil))
         if fm.fileExists(atPath: destination.path) {
@@ -303,11 +445,17 @@ struct ExportService: Sendable {
             throw ExportError.ditto(status: output.status, message: output.stderrString)
         }
 
-        progress?(.init(phase: .done, message: "Exported \(uniqueSources.count) presentation(s)\(mediaFileInfo.isEmpty ? "" : " and \(mediaFileInfo.count) media file(s)")", fraction: 1))
+        var summaryParts = ["\(uniqueSources.count) presentation(s)"]
+        if !mediaFileInfo.isEmpty { summaryParts.append("\(mediaFileInfo.count) media file(s)") }
+        if !themeFileInfo.isEmpty { summaryParts.append("\(themeFileInfo.count) theme(s)") }
+        if !fontFileInfo.isEmpty { summaryParts.append("\(fontFileInfo.count) font(s)") }
+        progress?(.init(phase: .done, message: "Exported \(summaryParts.joined(separator: ", "))", fraction: 1))
         return ExportResult(
             archiveURL: destination,
             includedFiles: uniqueSources.count,
             includedMediaFiles: mediaFileInfo.count,
+            includedThemeFiles: themeFileInfo.count,
+            includedFontFiles: fontFileInfo.count,
             missingPresentations: missing
         )
     }
@@ -446,11 +594,25 @@ struct Manifest: Codable, Sendable {
     let summary: Summary
     let items: [Item]
     let media: [FileInfo]?
+    let themes: [FileInfo]?
+    let fonts: [FileInfo]?
+    let audienceLooks: [PPLookSummary]?
 
-    init(plan: ExportPlan, files: [URL: FileInfo], media: [FileInfo] = [], date: Date = Date()) {
+    init(
+        plan: ExportPlan,
+        files: [URL: FileInfo],
+        media: [FileInfo] = [],
+        themes: [FileInfo] = [],
+        fonts: [FileInfo] = [],
+        includeAudienceLooks: Bool = true,
+        date: Date = Date()
+    ) {
         let info = Bundle.main.infoDictionary
         exportedAt = date
         self.media = media.isEmpty ? nil : media
+        self.themes = themes.isEmpty ? nil : themes
+        self.fonts = fonts.isEmpty ? nil : fonts
+        self.audienceLooks = (includeAudienceLooks && !plan.audienceLooks.isEmpty) ? plan.audienceLooks : nil
         generator = Generator(
             name: info?["CFBundleName"] as? String ?? "ProPack",
             version: info?["CFBundleShortVersionString"] as? String ?? "dev"
