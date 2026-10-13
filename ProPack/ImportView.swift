@@ -82,6 +82,20 @@ struct ImportSheetView: View {
                     Text("Presentations").font(.caption).foregroundStyle(.secondary)
                     Text("\(package.presentations.count) song(s)").font(.body.weight(.medium))
                 }
+                if !package.themes.isEmpty {
+                    Divider()
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Themes").font(.caption).foregroundStyle(.secondary)
+                        Text("\(package.themes.count) theme(s)").font(.body.weight(.medium))
+                    }
+                }
+                if !package.fonts.isEmpty {
+                    Divider()
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Fonts").font(.caption).foregroundStyle(.secondary)
+                        Text("\(package.fonts.count) font(s)").font(.body.weight(.medium))
+                    }
+                }
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Exported From").font(.caption).foregroundStyle(.secondary)
@@ -136,11 +150,22 @@ struct ImportSheetView: View {
                     }
                 }
                 if let target = model.selectedTargetLibraryURL ?? model.availableLibraries.first {
-                    Text(target.path)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Library: \(target.path)")
+                        if !package.themes.isEmpty {
+                            Text("Themes: \(ThemeLocator.targetThemesDirectory(forTargetLibraryURL: target).path)")
+                        }
+                        if !package.media.isEmpty {
+                            Text("Media: \(MediaLocator.targetMediaDirectory(forTargetLibraryURL: target).path)")
+                        }
+                        if !package.fonts.isEmpty {
+                            Text("Fonts: \(FontLocator.userFontsDirectory.path)")
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
                 }
             }
 
@@ -249,6 +274,20 @@ struct ImportSheetView: View {
                         Text("Songs Skipped:")
                         Spacer()
                         Text("\(result.skippedSongsCount) (kept existing)").bold()
+                    }
+                }
+                if result.importedThemesCount > 0 {
+                    HStack {
+                        Text("Themes Imported:")
+                        Spacer()
+                        Text("\(result.importedThemesCount)").bold()
+                    }
+                }
+                if result.importedFontsCount > 0 {
+                    HStack {
+                        Text("Fonts Installed:")
+                        Spacer()
+                        Text("\(result.importedFontsCount)").bold()
                     }
                 }
                 if let plName = result.playlistName {

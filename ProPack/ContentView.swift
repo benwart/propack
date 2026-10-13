@@ -454,17 +454,50 @@ struct ExportBar: View {
                 Button("Cancel") { model.cancelExport() }
             } else {
                 HStack(spacing: 8) {
-                    if let plan = model.plan, !plan.referencedMedia.isEmpty {
-                        Toggle(isOn: Binding(
-                            get: { model.includeMediaInExport },
-                            set: { model.includeMediaInExport = $0 }
-                        )) {
-                            Label("Media (\(plan.referencedMedia.count))", systemImage: "photo.on.rectangle")
-                                .font(.callout)
+                    if let plan = model.plan {
+                        let hasMedia = !plan.referencedMedia.isEmpty
+                        let hasThemes = !plan.referencedThemes.isEmpty
+                        let hasFonts = !plan.referencedFonts.isEmpty
+
+                        if hasMedia {
+                            Toggle(isOn: Binding(
+                                get: { model.includeMediaInExport },
+                                set: { model.includeMediaInExport = $0 }
+                            )) {
+                                Label("Media (\(plan.referencedMedia.count))", systemImage: "photo.on.rectangle")
+                                    .font(.callout)
+                            }
+                            .toggleStyle(.checkbox)
+                            .help("Include \(plan.referencedMedia.count) referenced media files (\(plan.formattedMediaSize)) in the package")
                         }
-                        .toggleStyle(.checkbox)
-                        .help("Include \(plan.referencedMedia.count) referenced media files (\(plan.formattedMediaSize)) in the package")
-                        Divider().frame(height: 16)
+
+                        if hasThemes {
+                            Toggle(isOn: Binding(
+                                get: { model.includeThemesInExport },
+                                set: { model.includeThemesInExport = $0 }
+                            )) {
+                                Label("Themes (\(plan.referencedThemes.count))", systemImage: "paintbrush")
+                                    .font(.callout)
+                            }
+                            .toggleStyle(.checkbox)
+                            .help("Include \(plan.referencedThemes.count) Audience Look / presentation theme(s) (\(plan.referencedThemes.map(\.themeName).joined(separator: ", "))) in the package")
+                        }
+
+                        if hasFonts {
+                            Toggle(isOn: Binding(
+                                get: { model.includeFontsInExport },
+                                set: { model.includeFontsInExport = $0 }
+                            )) {
+                                Label("Fonts (\(plan.referencedFonts.count))", systemImage: "textformat")
+                                    .font(.callout)
+                            }
+                            .toggleStyle(.checkbox)
+                            .help("Include \(plan.referencedFonts.count) custom font file(s) (\(plan.referencedFonts.map(\.fontName).joined(separator: ", "))) in the package")
+                        }
+
+                        if hasMedia || hasThemes || hasFonts {
+                            Divider().frame(height: 16)
+                        }
                     }
 
                     Button {
@@ -509,7 +542,7 @@ struct ExportBar: View {
                       systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
             } else {
-                Text("Exports .pro files and manifest.json as a .zip package.").foregroundStyle(.secondary)
+                Text("Exports .pro files, themes, fonts, and manifest.json as a package.").foregroundStyle(.secondary)
             }
         case .running(let progress):
             HStack(spacing: 10) {
@@ -543,7 +576,11 @@ struct ExportBar: View {
     }
 
     private func finishedMessage(_ result: ExportResult) -> String {
-        var text = "Exported \(result.includedFiles) file(s) to \(result.archiveURL.lastPathComponent)"
+        var parts = ["\(result.includedFiles) presentation(s)"]
+        if result.includedThemeFiles > 0 { parts.append("\(result.includedThemeFiles) theme(s)") }
+        if result.includedFontFiles > 0 { parts.append("\(result.includedFontFiles) font(s)") }
+        if result.includedMediaFiles > 0 { parts.append("\(result.includedMediaFiles) media") }
+        var text = "Exported \(parts.joined(separator: ", ")) to \(result.archiveURL.lastPathComponent)"
         if !result.missingPresentations.isEmpty { text += " (\(result.missingPresentations.count) missing)" }
         return text
     }

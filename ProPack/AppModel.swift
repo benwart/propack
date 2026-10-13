@@ -65,6 +65,8 @@ final class AppModel {
     // Export
     private(set) var exportState: ExportState = .idle
     var includeMediaInExport: Bool = true
+    var includeThemesInExport: Bool = true
+    var includeFontsInExport: Bool = true
 
     // Import
     var importState: ImportState = .idle
@@ -267,10 +269,18 @@ final class AppModel {
 
         let service = ExportService(client: client)
         let includeMedia = includeMediaInExport
+        let includeThemes = includeThemesInExport
+        let includeFonts = includeFontsInExport
         exportState = .running(.init(phase: .staging, message: "Preparing…", fraction: 0))
         exportTask = Task { [weak self] in
             do {
-                let result = try await service.export(plan: plan, to: destination, includeMedia: includeMedia) { progress in
+                let result = try await service.export(
+                    plan: plan,
+                    to: destination,
+                    includeMedia: includeMedia,
+                    includeThemes: includeThemes,
+                    includeFonts: includeFonts
+                ) { progress in
                     Task { @MainActor in
                         guard let self, self.isExporting else { return }
                         self.exportState = .running(progress)
@@ -279,6 +289,10 @@ final class AppModel {
                 guard let self else { return }
                 self.exportState = .finished(result)
                 let fileSizeBytes = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? NSNumber)?.int64Value
+                var exportedParts = ["\(result.includedFiles) presentation(s)"]
+                if result.includedMediaFiles > 0 { exportedParts.append("\(result.includedMediaFiles) media file(s)") }
+                if result.includedThemeFiles > 0 { exportedParts.append("\(result.includedThemeFiles) theme(s)") }
+                if result.includedFontFiles > 0 { exportedParts.append("\(result.includedFontFiles) font(s)") }
                 let record = TransferRecord(
                     type: .export,
                     playlistName: plan.playlist.name,
@@ -287,7 +301,7 @@ final class AppModel {
                     filePath: destination.path,
                     fileSizeBytes: fileSizeBytes,
                     status: .completed,
-                    detail: "Exported \(result.includedFiles) presentation(s) and \(result.includedMediaFiles) media file(s) to \(destination.lastPathComponent)"
+                    detail: "Exported \(exportedParts.joined(separator: ", ")) to \(destination.lastPathComponent)"
                 )
                 TransferHistoryStore.shared.record(record)
             } catch is CancellationError {
@@ -319,11 +333,19 @@ final class AppModel {
 
         let service = ExportService(client: client)
         let includeMedia = includeMediaInExport
+        let includeThemes = includeThemesInExport
+        let includeFonts = includeFontsInExport
         exportState = .running(.init(phase: .staging, message: "Preparing AirDrop package…", fraction: 0))
 
         exportTask = Task { [weak self] in
             do {
-                let result = try await service.export(plan: plan, to: archiveDestination, includeMedia: includeMedia) { progress in
+                let result = try await service.export(
+                    plan: plan,
+                    to: archiveDestination,
+                    includeMedia: includeMedia,
+                    includeThemes: includeThemes,
+                    includeFonts: includeFonts
+                ) { progress in
                     Task { @MainActor in
                         guard let self, self.isExporting else { return }
                         self.exportState = .running(progress)
@@ -347,6 +369,10 @@ final class AppModel {
                         self.currentAirDropTempDirectory = nil
                         switch airDropResult {
                         case .success:
+                            var parts = ["\(result.includedFiles) presentation(s)"]
+                            if result.includedMediaFiles > 0 { parts.append("\(result.includedMediaFiles) media file(s)") }
+                            if result.includedThemeFiles > 0 { parts.append("\(result.includedThemeFiles) theme(s)") }
+                            if result.includedFontFiles > 0 { parts.append("\(result.includedFontFiles) font(s)") }
                             let record = TransferRecord(
                                 type: .airdrop,
                                 playlistName: plan.playlist.name,
@@ -355,7 +381,7 @@ final class AppModel {
                                 filePath: nil,
                                 fileSizeBytes: (try? FileManager.default.attributesOfItem(atPath: result.archiveURL.path)[.size] as? NSNumber)?.int64Value,
                                 status: .completed,
-                                detail: "Transferred \(result.includedFiles) presentation(s) and \(result.includedMediaFiles) media file(s) via AirDrop"
+                                detail: "Transferred \(parts.joined(separator: ", ")) via AirDrop"
                             )
                             TransferHistoryStore.shared.record(record)
                             self.exportState = .airDropFinished(playlistName: plan.playlist.name)
@@ -398,19 +424,35 @@ final class AppModel {
 
     var availableLibraries: [URL] {
         var urls: [URL] = []
-        if let manual = manualLibraryURL { urls.append(manual) }
-        if let discovered = discoveredLibraryURL { urls.append(discovered) }
-        for root in LibraryLocator.defaultLibraryRoots {
-            if let children = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) {
-                for child in children {
-                    var isDir: ObjCBool = false
-                    if FileManager.default.fileExists(atPath: child.path, isDirectory: &isDir), isDir.boolValue {
-                        urls.append(child)
+
+        func appendLibraryRootOrChildren(_ root: URL) {
+            if root.lastPathComponent == "Libraries" {
+                if let children = try? FileManager.default.contentsOfDirectory(
+                    at: root,
+                    includingPropertiesForKeys: [.isDirectoryKey],
+                    options: [.skipsHiddenFiles]
+                ) {
+                    var addedChild = false
+                    for child in children {
+                        var isDir: ObjCBool = false
+                        if FileManager.default.fileExists(atPath: child.path, isDirectory: &isDir), isDir.boolValue {
+                            urls.append(child)
+                            addedChild = true
+                        }
                     }
+                    if addedChild { return }
                 }
-            } else if FileManager.default.fileExists(atPath: root.path) {
+            }
+            if FileManager.default.fileExists(atPath: root.path) {
                 urls.append(root)
             }
+        }
+
+        if let manual = manualLibraryURL { appendLibraryRootOrChildren(manual) }
+        if let activeLib = LibraryLocator.configuredActiveLibraryDirectory { urls.append(activeLib) }
+        if let discovered = discoveredLibraryURL { appendLibraryRootOrChildren(discovered) }
+        for root in LibraryLocator.defaultLibraryRoots {
+            appendLibraryRootOrChildren(root)
         }
         return LibraryLocator.normalizedRoots(urls)
     }
@@ -438,6 +480,11 @@ final class AppModel {
             guard let self else { return }
             let service = ImportService(client: self.client)
             do {
+                if self.discoveredLibraryURL == nil, let client = self.client {
+                    if let apiDetected = await LibraryLocator.discoverActiveLibraryFromAPI(client: client) {
+                        self.discoveredLibraryURL = apiDetected.firstLibraryFolder ?? apiDetected.librariesRoot
+                    }
+                }
                 let package = try await service.inspect(archiveURL: url)
                 guard !Task.isCancelled else { return }
                 self.importState = .ready(package)
@@ -481,6 +528,8 @@ final class AppModel {
                 if result.renamedSongsCount > 0 { summaryParts.append("\(result.renamedSongsCount) renamed") }
                 if result.skippedSongsCount > 0 { summaryParts.append("\(result.skippedSongsCount) skipped") }
                 if result.importedMediaCount > 0 { summaryParts.append("\(result.importedMediaCount) media") }
+                if result.importedThemesCount > 0 { summaryParts.append("\(result.importedThemesCount) theme(s)") }
+                if result.importedFontsCount > 0 { summaryParts.append("\(result.importedFontsCount) font(s)") }
                 let detailMsg = "\(package.playlistName) → \(result.targetLibraryName) (\(summaryParts.joined(separator: ", ")))"
                 let fileSizeBytes = (try? FileManager.default.attributesOfItem(atPath: package.archiveURL.path)[.size] as? NSNumber)?.int64Value
                 let record = TransferRecord(

@@ -8,6 +8,8 @@ struct SettingsView: View {
     @AppStorage("defaultSongConflictPolicy") private var defaultSongPolicy: String = SongConflictPolicy.rename.rawValue
     @AppStorage("defaultPlaylistConflictPolicy") private var defaultPlaylistPolicy: String = PlaylistConflictPolicy.keepBoth.rawValue
     @AppStorage("defaultIncludeMedia") private var defaultIncludeMedia: Bool = true
+    @AppStorage("defaultIncludeThemes") private var defaultIncludeThemes: Bool = true
+    @AppStorage("defaultIncludeFonts") private var defaultIncludeFonts: Bool = true
     @AppStorage("customMediaDirectory") private var customMediaDirectory: String = ""
 
     private let appVersion: String = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
@@ -54,6 +56,10 @@ struct SettingsView: View {
             Section("Export Defaults") {
                 Toggle("Automatically bundle referenced media files", isOn: $defaultIncludeMedia)
                     .help("Include background videos, images, and audio tracks in exported packages by default")
+                Toggle("Automatically bundle Audience Look & presentation themes", isOn: $defaultIncludeThemes)
+                    .help("Include ProPresenter Themes referenced by active Audience Looks and presentations")
+                Toggle("Automatically bundle custom fonts", isOn: $defaultIncludeFonts)
+                    .help("Include non-system fonts (.ttf, .otf, .ttc) used by slides and themes")
             }
 
             Section("Startup") {
