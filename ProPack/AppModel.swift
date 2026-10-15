@@ -168,7 +168,8 @@ final class AppModel {
             if let id = selectedPlaylistID, PPPlaylistNode.find(id, in: playlists) != nil {
                 await preparePlan()
             } else {
-                selectedPlaylistID = PPPlaylistNode.leaves(of: playlists).first?.id
+                let sortedLeaves = PPPlaylistNode.search(nodes: playlists, query: "", sortOption: .dateDescending)
+                selectedPlaylistID = sortedLeaves.first?.node.id ?? PPPlaylistNode.leaves(of: playlists).first?.id
             }
         } catch {
             playlistsError = error.localizedDescription

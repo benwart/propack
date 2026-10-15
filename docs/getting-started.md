@@ -50,7 +50,7 @@ If ProPresenter is running with custom network restrictions or in a different sa
 ## Exporting Your First Playlist
 
 1. **Select a Playlist**:
-   In the left sidebar, navigate the playlist tree. Click any playlist item (folders will expand to show nested playlists).
+   In the left sidebar, navigate the playlist tree or use the fuzzy search bar to filter playlists in real time while typing. Sort playlists by date (default: newest at the top) or name (A–Z / Z–A) using the sort menu (`arrow.up.arrow.down`). You can also toggle between Tree View and Flat List. Click any playlist item to preview its contents.
 2. **Review Presentations & Mappings**:
    ProPack will asynchronously query presentation metadata and match local `.pro` files.
    - **Green Checkmark**: The `.pro` file was discovered and verified on disk.

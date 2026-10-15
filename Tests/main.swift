@@ -13,6 +13,7 @@ func main() async {
     await runThemeAndFontLocatorTests()
     await runTransferHistoryTests()
     await runZipRoundtripTests()
+    await runPlaylistFilterTests()
 
     let code = TestSuite.shared.report()
     exit(code)

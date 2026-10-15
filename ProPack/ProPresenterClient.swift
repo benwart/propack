@@ -40,11 +40,60 @@ struct PPPlaylistNode: Decodable, Hashable, Identifiable, Sendable {
     let identifier: PPIdentifier
     let fieldType: String?
     let children: [PPPlaylistNode]?
+    let date: Date?
 
     enum CodingKeys: String, CodingKey {
         case identifier = "id"
         case fieldType
         case children
+        case date
+        case createdAt = "created_at"
+        case modifiedAt = "modified_at"
+    }
+
+    init(
+        identifier: PPIdentifier,
+        fieldType: String? = nil,
+        children: [PPPlaylistNode]? = nil,
+        date: Date? = nil
+    ) {
+        self.identifier = identifier
+        self.fieldType = fieldType
+        self.children = children
+        self.date = date
+    }
+
+    init(
+        uuid: String = UUID().uuidString,
+        name: String,
+        fieldType: String? = nil,
+        children: [PPPlaylistNode]? = nil,
+        index: Int? = nil,
+        date: Date? = nil
+    ) {
+        self.identifier = PPIdentifier(uuid: uuid, name: name, index: index)
+        self.fieldType = fieldType
+        self.children = children
+        self.date = date
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        identifier = try c.decode(PPIdentifier.self, forKey: .identifier)
+        fieldType = try c.decodeIfPresent(String.self, forKey: .fieldType)
+        children = try c.decodeIfPresent([PPPlaylistNode].self, forKey: .children)
+
+        if let d = try? c.decodeIfPresent(Date.self, forKey: .date) {
+            date = d
+        } else if let s = try? c.decodeIfPresent(String.self, forKey: .date), let d = ISO8601DateFormatter().date(from: s) {
+            date = d
+        } else if let d = try? c.decodeIfPresent(Date.self, forKey: .modifiedAt) {
+            date = d
+        } else if let d = try? c.decodeIfPresent(Date.self, forKey: .createdAt) {
+            date = d
+        } else {
+            date = nil
+        }
     }
 
     var id: String { identifier.uuid }

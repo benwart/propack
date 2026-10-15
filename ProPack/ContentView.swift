@@ -250,20 +250,90 @@ private struct SetupStep: View {
 @MainActor
 struct PlaylistSidebar: View {
     @Environment(AppModel.self) private var model
+    private var searchState = State(initialValue: "")
+    @AppStorage("playlistSortOption") private var sortOptionRaw: String = PlaylistSortOption.dateDescending.rawValue
+    @AppStorage("playlistViewMode") private var viewMode: String = "tree"
+
+    private var searchText: String {
+        get { searchState.wrappedValue }
+        nonmutating set { searchState.wrappedValue = newValue }
+    }
+
+    private var sortOption: PlaylistSortOption {
+        get { PlaylistSortOption(rawValue: sortOptionRaw) ?? .dateDescending }
+        nonmutating set { sortOptionRaw = newValue.rawValue }
+    }
+
+    private var isSearching: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var searchResults: [PlaylistRowItem] {
+        PPPlaylistNode.search(nodes: model.playlists, query: searchText, sortOption: sortOption)
+    }
+
+    private var sortedTree: [PPPlaylistNode] {
+        model.playlists.sortedTree(by: sortOption)
+    }
 
     var body: some View {
         List(selection: Binding(get: { model.selectedPlaylistID }, set: { model.selectedPlaylistID = $0 })) {
             if let error = model.playlistsError {
                 Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red)
             }
-            Section("Playlists") {
-                OutlineGroup(model.playlists, children: \.outlineChildren) { node in
-                    Label(node.name, systemImage: node.isGroup ? "folder" : "music.note.list")
-                        .tag(node.id)
-                        .selectionDisabled(node.isGroup)
+
+            if isSearching {
+                Section {
+                    ForEach(searchResults) { item in
+                        playlistRow(for: item)
+                            .tag(item.node.id)
+                    }
+                } header: {
+                    HStack {
+                        Text("\(searchResults.count) \(searchResults.count == 1 ? "match" : "matches")")
+                        Spacer()
+                        Button("Clear") {
+                            searchText = ""
+                        }
+                        .buttonStyle(.borderless)
+                        .font(.caption2)
+                    }
+                }
+            } else if viewMode == "flat" {
+                let flatItems = PPPlaylistNode.search(nodes: model.playlists, query: "", sortOption: sortOption)
+                Section {
+                    ForEach(flatItems) { item in
+                        playlistRow(for: item)
+                            .tag(item.node.id)
+                    }
+                } header: {
+                    HStack {
+                        Text("All Playlists (\(flatItems.count))")
+                        Spacer()
+                        Text(sortOption.shortLabel)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                Section {
+                    OutlineGroup(sortedTree, children: \.outlineChildren) { node in
+                        treeNodeRow(for: node)
+                            .tag(node.id)
+                            .selectionDisabled(node.isGroup)
+                    }
+                } header: {
+                    HStack {
+                        Text("Playlists")
+                        Spacer()
+                        Text(sortOption.shortLabel)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
+        .searchable(text: searchState.projectedValue, placement: .sidebar, prompt: "Search playlists (fuzzy)…")
         .overlay {
             if !model.connection.isConnected {
                 ContentUnavailableView("Not Connected", systemImage: "bolt.horizontal.circle",
@@ -272,10 +342,28 @@ struct PlaylistSidebar: View {
                 ProgressView()
             } else if model.playlists.isEmpty {
                 ContentUnavailableView("No Playlists", systemImage: "music.note.list")
+            } else if isSearching && searchResults.isEmpty {
+                ContentUnavailableView.search(text: searchText)
             }
         }
         .toolbar {
-            ToolbarItem {
+            ToolbarItemGroup {
+                Menu {
+                    Picker("Sort By", selection: Binding(get: { sortOption }, set: { sortOption = $0 })) {
+                        ForEach(PlaylistSortOption.allCases) { option in
+                            Text(option.label).tag(option)
+                        }
+                    }
+                    Divider()
+                    Picker("Display", selection: $viewMode) {
+                        Label("Tree View", systemImage: "folder").tag("tree")
+                        Label("Flat List", systemImage: "list.bullet").tag("flat")
+                    }
+                } label: {
+                    Label("Sort & View", systemImage: "arrow.up.arrow.down")
+                }
+                .help("Sort playlists by name or date (Default: Newest First)")
+
                 Button {
                     Task { await model.reloadPlaylists() }
                 } label: {
@@ -283,6 +371,54 @@ struct PlaylistSidebar: View {
                 }
                 .disabled(!model.connection.isConnected || model.isLoadingPlaylists)
                 .help("Reload playlists")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func playlistRow(for item: PlaylistRowItem) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "music.note.list")
+                .foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 2) {
+                if let match = item.match, !match.matchedIndices.isEmpty {
+                    Text(FuzzyMatcher.highlightedString(for: item.node.name, matchedIndices: match.matchedIndices))
+                        .lineLimit(1)
+                } else {
+                    Text(item.node.name)
+                        .lineLimit(1)
+                }
+                if let path = item.folderPath {
+                    Text(path)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer()
+            if let dateStr = item.node.formattedDateString {
+                Text(dateStr)
+                    .font(.caption2.monospacedDigit())
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(.quaternary))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func treeNodeRow(for node: PPPlaylistNode) -> some View {
+        HStack {
+            Label(node.name, systemImage: node.isGroup ? "folder" : "music.note.list")
+            Spacer()
+            if !node.isGroup, let dateStr = node.formattedDateString {
+                Text(dateStr)
+                    .font(.caption2.monospacedDigit())
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(.quaternary))
+                    .foregroundStyle(.secondary)
             }
         }
     }
