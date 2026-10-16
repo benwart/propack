@@ -10,5 +10,5 @@ uv 0.13.0
 
 # Node.js:
 # Used for semantic-release and conventional commit release automation.
-nodejs 26.11.1
+nodejs 26.2.0
 

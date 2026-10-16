@@ -222,16 +222,21 @@ struct ImportSheetView: View {
                             .foregroundStyle(.secondary)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(presentation.name).font(.body.weight(.medium))
-                            HStack(spacing: 8) {
+                            HStack(spacing: 6) {
                                 Text("\(presentation.slideCount) slides")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                                 if !presentation.groupNames.isEmpty {
                                     Text("·")
-                                    Text(presentation.groupNames.joined(separator: ", "))
-                                        .lineLimit(1)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    HStack(spacing: 3) {
+                                        ForEach(presentation.groupNames, id: \.self) { gName in
+                                            GroupBadgeView(name: gName, color: GroupColorResolver.color(for: gName))
+                                        }
+                                    }
                                 }
                             }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                         }
                         Spacer()
                     }

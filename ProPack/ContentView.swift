@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 @MainActor
@@ -5,13 +6,18 @@ struct ContentView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
     @AppStorage("proPresenterPort") private var port: Int = 0
+    @AppStorage(LayoutDefaults.leftColumnWidthKey) private var leftColumnWidth: Double = LayoutDefaults.defaultLeftColumnWidth
     private var showConnectionSheetState = State(initialValue: false)
     private var showHistorySheetState = State(initialValue: false)
 
     var body: some View {
         NavigationSplitView {
             PlaylistSidebar()
-                .navigationSplitViewColumnWidth(min: 220, ideal: 260)
+                .navigationSplitViewColumnWidth(
+                    min: CGFloat(LayoutDefaults.minLeftColumnWidth),
+                    ideal: CGFloat(leftColumnWidth),
+                    max: CGFloat(LayoutDefaults.maxLeftColumnWidth)
+                )
         } detail: {
             if model.connection.isConnected {
                 PlaylistDetailView()
@@ -99,6 +105,7 @@ struct ContentView: View {
         .task {
             if let detected = await model.connectOnLaunch(savedPort: port) { port = detected }
         }
+        .background(WindowFrameTracker())
     }
 }
 
@@ -250,18 +257,21 @@ private struct SetupStep: View {
 @MainActor
 struct PlaylistSidebar: View {
     @Environment(AppModel.self) private var model
-    private var searchState = State(initialValue: "")
-    @AppStorage("playlistSortOption") private var sortOptionRaw: String = PlaylistSortOption.dateDescending.rawValue
-    @AppStorage("playlistViewMode") private var viewMode: String = "tree"
+    @AppStorage(LayoutDefaults.playlistSortOptionKey) private var sortOptionRaw: String = PlaylistSortOption.dateDescending.rawValue
+    @AppStorage(LayoutDefaults.playlistViewModeKey) private var viewMode: String = "tree"
+    @AppStorage(LayoutDefaults.leftColumnWidthKey) private var leftColumnWidth: Double = LayoutDefaults.defaultLeftColumnWidth
 
     private var searchText: String {
-        get { searchState.wrappedValue }
-        nonmutating set { searchState.wrappedValue = newValue }
+        get { model.playlistSearchText }
+        nonmutating set { model.playlistSearchText = newValue }
     }
 
     private var sortOption: PlaylistSortOption {
         get { PlaylistSortOption(rawValue: sortOptionRaw) ?? .dateDescending }
-        nonmutating set { sortOptionRaw = newValue.rawValue }
+        nonmutating set {
+            sortOptionRaw = newValue.rawValue
+            LayoutPreferences().saveSortOption(newValue)
+        }
     }
 
     private var isSearching: Bool {
@@ -276,13 +286,30 @@ struct PlaylistSidebar: View {
         model.playlists.sortedTree(by: sortOption)
     }
 
+    @ViewBuilder
     var body: some View {
+        if !model.connection.isConnected {
+            ContentUnavailableView("Not Connected", systemImage: "bolt.horizontal.circle",
+                                   description: Text("Connect to ProPresenter to see playlists."))
+        } else if model.isLoadingPlaylists && model.playlists.isEmpty {
+            ProgressView()
+        } else if model.playlists.isEmpty {
+            ContentUnavailableView("No Playlists", systemImage: "music.note.list")
+        } else {
+            playlistList
+        }
+    }
+
+    @ViewBuilder
+    private var playlistList: some View {
         List(selection: Binding(get: { model.selectedPlaylistID }, set: { model.selectedPlaylistID = $0 })) {
             if let error = model.playlistsError {
                 Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red)
             }
 
-            if isSearching {
+            if isSearching && searchResults.isEmpty {
+                ContentUnavailableView.search(text: searchText)
+            } else if isSearching {
                 Section {
                     ForEach(searchResults) { item in
                         playlistRow(for: item)
@@ -316,36 +343,42 @@ struct PlaylistSidebar: View {
                     }
                 }
             } else {
-                Section {
-                    OutlineGroup(sortedTree, children: \.outlineChildren) { node in
-                        treeNodeRow(for: node)
-                            .tag(node.id)
-                            .selectionDisabled(node.isGroup)
+                let hasGroups = sortedTree.contains(where: \.isGroup)
+                if hasGroups {
+                    Section {
+                        OutlineGroup(sortedTree, children: \.outlineChildren) { node in
+                            treeNodeRow(for: node)
+                                .tag(node.id)
+                                .selectionDisabled(node.isGroup)
+                        }
+                    } header: {
+                        HStack {
+                            Text("Playlists")
+                            Spacer()
+                            Text(sortOption.shortLabel)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                } header: {
-                    HStack {
-                        Text("Playlists")
-                        Spacer()
-                        Text(sortOption.shortLabel)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                } else {
+                    Section {
+                        ForEach(sortedTree) { node in
+                            treeNodeRow(for: node)
+                                .tag(node.id)
+                        }
+                    } header: {
+                        HStack {
+                            Text("Playlists (\(sortedTree.count))")
+                            Spacer()
+                            Text(sortOption.shortLabel)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
         }
-        .searchable(text: searchState.projectedValue, placement: .sidebar, prompt: "Search playlists (fuzzy)…")
-        .overlay {
-            if !model.connection.isConnected {
-                ContentUnavailableView("Not Connected", systemImage: "bolt.horizontal.circle",
-                                       description: Text("Connect to ProPresenter to see playlists."))
-            } else if model.isLoadingPlaylists && model.playlists.isEmpty {
-                ProgressView()
-            } else if model.playlists.isEmpty {
-                ContentUnavailableView("No Playlists", systemImage: "music.note.list")
-            } else if isSearching && searchResults.isEmpty {
-                ContentUnavailableView.search(text: searchText)
-            }
-        }
+        .searchable(text: Binding(get: { model.playlistSearchText }, set: { model.playlistSearchText = $0 }), placement: .sidebar, prompt: "Search playlists (fuzzy)…")
         .toolbar {
             ToolbarItemGroup {
                 Menu {
@@ -373,6 +406,29 @@ struct PlaylistSidebar: View {
                 .help("Reload playlists")
             }
         }
+        .onChange(of: sortOptionRaw) { _, newValue in
+            if let option = PlaylistSortOption(rawValue: newValue) {
+                LayoutPreferences().saveSortOption(option)
+            }
+        }
+        .onChange(of: viewMode) { _, newValue in
+            LayoutPreferences().saveViewMode(newValue)
+        }
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: LeftColumnWidthPreferenceKey.self, value: proxy.size.width)
+            }
+        )
+        .onPreferenceChange(LeftColumnWidthPreferenceKey.self) { newWidth in
+            guard newWidth >= CGFloat(LayoutDefaults.minLeftColumnWidth) &&
+                  newWidth <= CGFloat(LayoutDefaults.maxLeftColumnWidth) else { return }
+            let existing = LayoutPreferences().leftColumnWidth
+            if abs(Double(newWidth) - existing) >= 1.0 {
+                LayoutPreferences().saveLeftColumnWidth(Double(newWidth))
+                leftColumnWidth = Double(newWidth)
+            }
+        }
+        .background(SplitViewTracker(columnWidth: $leftColumnWidth))
     }
 
     @ViewBuilder
@@ -509,10 +565,10 @@ struct PresentationTable: View {
             .width(min: 90, ideal: 130)
             TableColumn("Groups") { entry in
                 if entry.isPresentation {
-                    Text(groupSummary(entry)).foregroundStyle(.secondary).lineLimit(1)
-                        .help(groupSummary(entry))
+                    groupBadges(for: entry)
                 }
             }
+            .width(min: 170, ideal: 260)
             TableColumn("File") { entry in
                 if let match = entry.match {
                     Text(match.url.lastPathComponent)
@@ -539,6 +595,23 @@ struct PresentationTable: View {
     private func groupSummary(_ entry: ExportPlan.Entry) -> String {
         let names = (entry.presentation?.groups ?? []).compactMap(\.name).filter { !$0.isEmpty }
         return names.isEmpty ? "—" : names.joined(separator: ", ")
+    }
+
+    @ViewBuilder
+    private func groupBadges(for entry: ExportPlan.Entry) -> some View {
+        let groups = (entry.presentation?.groups ?? []).filter { !($0.name ?? "").isEmpty }
+        if groups.isEmpty {
+            Text("—").foregroundStyle(.secondary)
+        } else {
+            HStack(spacing: 4) {
+                ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
+                    let name = group.name ?? ""
+                    let color = GroupColorResolver.color(for: name, customColor: group.color)
+                    GroupBadgeView(name: name, color: color)
+                }
+            }
+            .help(groupSummary(entry))
+        }
     }
 }
 
@@ -731,3 +804,151 @@ struct ContentView_Previews: PreviewProvider {
     }
 }
 #endif
+
+// MARK: - Layout Persistence Helpers
+
+private struct LeftColumnWidthPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        let next = nextValue()
+        if next > 0 { value = next }
+    }
+}
+
+@MainActor
+struct WindowFrameTracker: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        WindowTrackingView()
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+private final class WindowTrackingView: NSView {
+    private var resizeObserver: Any?
+    private var hasConfiguredWindow = false
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard let window = self.window, !hasConfiguredWindow else { return }
+        hasConfiguredWindow = true
+        configureWindow(window)
+    }
+
+    private func configureWindow(_ window: NSWindow) {
+        window.setFrameAutosaveName("ProPackMainWindow")
+
+        let prefs = LayoutPreferences()
+        let savedSize = prefs.windowSize
+
+        let screen = window.screen ?? NSScreen.main
+        let screenFrame = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
+        let finalWidth = min(max(CGFloat(LayoutDefaults.minWindowWidth), savedSize.width), screenFrame.width)
+        let finalHeight = min(max(CGFloat(LayoutDefaults.minWindowHeight), savedSize.height), screenFrame.height)
+
+        var frame = window.frame
+        let currentTopLeft = NSPoint(x: frame.origin.x, y: frame.origin.y + frame.size.height)
+        frame.size = NSSize(width: finalWidth, height: finalHeight)
+        frame.origin.y = currentTopLeft.y - finalHeight
+
+        if frame.origin.x < screenFrame.minX { frame.origin.x = screenFrame.minX }
+        if frame.origin.y < screenFrame.minY { frame.origin.y = screenFrame.minY }
+        if frame.maxX > screenFrame.maxX { frame.origin.x = max(screenFrame.minX, screenFrame.maxX - frame.width) }
+        if frame.maxY > screenFrame.maxY { frame.origin.y = max(screenFrame.minY, screenFrame.maxY - frame.height) }
+
+        window.setFrame(frame, display: true, animate: false)
+
+        resizeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResizeNotification,
+            object: window,
+            queue: .main
+        ) { [weak window] _ in
+            guard let win = window else { return }
+            let size = win.frame.size
+            guard size.width >= CGFloat(LayoutDefaults.minWindowWidth) &&
+                  size.height >= CGFloat(LayoutDefaults.minWindowHeight) else { return }
+            LayoutPreferences().saveWindowSize(width: Double(size.width), height: Double(size.height))
+        }
+    }
+
+    deinit {
+        if let observer = resizeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+}
+
+@MainActor
+struct SplitViewTracker: NSViewRepresentable {
+    @Binding var columnWidth: Double
+
+    func makeNSView(context: Context) -> NSView {
+        let view = SplitViewTrackingView()
+        view.onWidthChanged = { [weak view] newWidth in
+            _ = view
+            columnWidth = newWidth
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if let tracker = nsView as? SplitViewTrackingView {
+            tracker.onWidthChanged = { newWidth in
+                columnWidth = newWidth
+            }
+        }
+    }
+}
+
+private final class SplitViewTrackingView: NSView {
+    var onWidthChanged: ((Double) -> Void)?
+    private var splitViewObserver: Any?
+    private var hasConfiguredInitialPosition = false
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard let splitView = findSplitView() else { return }
+
+        if !hasConfiguredInitialPosition {
+            hasConfiguredInitialPosition = true
+            let savedWidth = LayoutPreferences().leftColumnWidth
+            if savedWidth >= LayoutDefaults.minLeftColumnWidth {
+                splitView.setPosition(CGFloat(savedWidth), ofDividerAt: 0)
+            }
+        }
+
+        if splitViewObserver == nil {
+            splitViewObserver = NotificationCenter.default.addObserver(
+                forName: NSSplitView.didResizeSubviewsNotification,
+                object: splitView,
+                queue: .main
+            ) { [weak self, weak splitView] _ in
+                guard let self, let splitView, let firstSubview = splitView.subviews.first else { return }
+                let currentWidth = Double(firstSubview.frame.width)
+                guard currentWidth >= LayoutDefaults.minLeftColumnWidth &&
+                      currentWidth <= LayoutDefaults.maxLeftColumnWidth else { return }
+                let existing = LayoutPreferences().leftColumnWidth
+                if abs(currentWidth - existing) >= 1.0 {
+                    LayoutPreferences().saveLeftColumnWidth(currentWidth)
+                    self.onWidthChanged?(currentWidth)
+                }
+            }
+        }
+    }
+
+    private func findSplitView() -> NSSplitView? {
+        var current: NSView? = self.superview
+        while let c = current {
+            if let split = c as? NSSplitView { return split }
+            current = c.superview
+        }
+        return nil
+    }
+
+    deinit {
+        if let observer = splitViewObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+}
+

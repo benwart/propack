@@ -10,6 +10,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             model?.openPackageForImport(url: url)
         }
     }
+
+    func applicationShouldHandleReopen(_ application: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            for window in application.windows {
+                window.makeKeyAndOrderFront(self)
+                return true
+            }
+        }
+        return true
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        if let idx = CommandLine.arguments.firstIndex(of: "--capture-screenshots") {
+            let outPath = (idx + 1 < CommandLine.arguments.count) ? CommandLine.arguments[idx + 1] : "docs/assets/screenshots"
+            let outURL = URL(fileURLWithPath: outPath)
+            Task {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                if let model = self.model {
+                    await ScreenshotCapture.run(model: model, outputDir: outURL)
+                }
+            }
+        }
+    }
 }
 
 @main
@@ -18,10 +41,11 @@ struct ProPackApp: App {
     private var modelState = State(initialValue: AppModel())
 
     var body: some Scene {
+        let initialSize = LayoutPreferences().windowSize
         Window("ProPack", id: "main") {
             ContentView()
                 .environment(modelState.wrappedValue)
-                .frame(minWidth: 820, minHeight: 520)
+                .frame(minWidth: CGFloat(LayoutDefaults.minWindowWidth), minHeight: CGFloat(LayoutDefaults.minWindowHeight))
                 .onOpenURL { url in
                     modelState.wrappedValue.openPackageForImport(url: url)
                 }
@@ -29,7 +53,7 @@ struct ProPackApp: App {
                     appDelegate.model = modelState.wrappedValue
                 }
         }
-        .defaultSize(width: 1000, height: 640)
+        .defaultSize(width: initialSize.width, height: initialSize.height)
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button("About ProPack") {

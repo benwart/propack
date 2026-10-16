@@ -79,6 +79,7 @@ struct TransferHistoryView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .labelsHidden()
                 .frame(maxWidth: 320)
 
                 Spacer()
@@ -170,9 +171,15 @@ private struct TransferRecordRow: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(badgeColor.opacity(0.15))
                     .frame(width: 38, height: 38)
-                Image(systemName: record.type.iconName)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(badgeColor)
+                if record.type == .airdrop {
+                    AirDropGlyph(lineWidth: 2.2)
+                        .foregroundStyle(badgeColor)
+                        .frame(width: 20, height: 20)
+                } else {
+                    Image(systemName: record.type.iconName)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(badgeColor)
+                }
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -235,3 +242,46 @@ private struct TransferRecordRow: View {
         }
     }
 }
+
+// MARK: - AirDrop Vector Icon Glyph
+
+/// Vector-drawn icon-font styled AirDrop glyph matching SF Symbols typography and stroke weights.
+struct AirDropGlyph: View {
+    var lineWidth: CGFloat = 2.2
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let center = CGPoint(x: w / 2, y: h * 0.52)
+            let r0 = w * 0.13
+            let r1 = w * 0.28
+            let r2 = w * 0.43
+
+            // Opening angle at the bottom: 60 degrees (from 60° to 120°, where 90° is straight down)
+            let startAngle = Angle(degrees: 120)
+            let endAngle = Angle(degrees: 60)
+
+            ZStack {
+                // Central filled circle
+                Circle()
+                    .frame(width: r0 * 2, height: r0 * 2)
+                    .position(center)
+
+                // Inner arc
+                Path { path in
+                    path.addArc(center: center, radius: r1, startAngle: startAngle, endAngle: endAngle, clockwise: false)
+                }
+                .stroke(style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+
+                // Outer arc
+                Path { path in
+                    path.addArc(center: center, radius: r2, startAngle: startAngle, endAngle: endAngle, clockwise: false)
+                }
+                .stroke(style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
+    }
+}
+

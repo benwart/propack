@@ -52,6 +52,7 @@ final class AppModel {
     var selectedPlaylistID: String? {
         didSet { if oldValue != selectedPlaylistID { Task { await preparePlan() } } }
     }
+    var playlistSearchText: String = ""
 
     // Plan / preview
     private(set) var plan: ExportPlan?
@@ -168,7 +169,8 @@ final class AppModel {
             if let id = selectedPlaylistID, PPPlaylistNode.find(id, in: playlists) != nil {
                 await preparePlan()
             } else {
-                let sortedLeaves = PPPlaylistNode.search(nodes: playlists, query: "", sortOption: .dateDescending)
+                let activeSort = LayoutPreferences().sortOption
+                let sortedLeaves = PPPlaylistNode.search(nodes: playlists, query: "", sortOption: activeSort)
                 selectedPlaylistID = sortedLeaves.first?.node.id ?? PPPlaylistNode.leaves(of: playlists).first?.id
             }
         } catch {

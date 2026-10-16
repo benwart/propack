@@ -10,7 +10,7 @@ enum TransferType: String, Codable, CaseIterable, Sendable {
     var iconName: String {
         switch self {
         case .export: "square.and.arrow.up"
-        case .airdrop: "airdrop"
+        case .airdrop: "dot.radiowaves.left.and.right"
         case .import: "square.and.arrow.down"
         }
     }

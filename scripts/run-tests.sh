@@ -25,6 +25,7 @@ swiftc \
     "${PROJECT_DIR}/ProPack/ExportService.swift" \
     "${PROJECT_DIR}/ProPack/ImportService.swift" \
     "${PROJECT_DIR}/ProPack/PlaylistFilter.swift" \
+    "${PROJECT_DIR}/ProPack/LayoutPreferences.swift" \
     "${PROJECT_DIR}/Tests"/*.swift
 
 echo "==> Running test suite..."

@@ -11,6 +11,8 @@ struct SettingsView: View {
     @AppStorage("defaultIncludeThemes") private var defaultIncludeThemes: Bool = true
     @AppStorage("defaultIncludeFonts") private var defaultIncludeFonts: Bool = true
     @AppStorage("customMediaDirectory") private var customMediaDirectory: String = ""
+    @AppStorage(LayoutDefaults.playlistSortOptionKey) private var sortOptionRaw: String = PlaylistSortOption.dateDescending.rawValue
+    @AppStorage(LayoutDefaults.playlistViewModeKey) private var viewMode: String = "tree"
 
     private let appVersion: String = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
     private let buildNumber: String = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
@@ -60,6 +62,33 @@ struct SettingsView: View {
                     .help("Include ProPresenter Themes referenced by active Audience Looks and presentations")
                 Toggle("Automatically bundle custom fonts", isOn: $defaultIncludeFonts)
                     .help("Include non-system fonts (.ttf, .otf, .ttc) used by slides and themes")
+            }
+
+            Section("Playlist Sidebar Defaults") {
+                Picker("Default Sort Order:", selection: Binding(
+                    get: { PlaylistSortOption(rawValue: sortOptionRaw) ?? .dateDescending },
+                    set: {
+                        sortOptionRaw = $0.rawValue
+                        LayoutPreferences().saveSortOption($0)
+                    }
+                )) {
+                    ForEach(PlaylistSortOption.allCases) { option in
+                        Text(option.label).tag(option)
+                    }
+                }
+                .help("Default sorting order for playlists in the sidebar")
+
+                Picker("Default Display Mode:", selection: Binding(
+                    get: { viewMode },
+                    set: {
+                        viewMode = $0
+                        LayoutPreferences().saveViewMode($0)
+                    }
+                )) {
+                    Text("Tree View (Hierarchical)").tag("tree")
+                    Text("Flat List (All Playlists)").tag("flat")
+                }
+                .help("Default layout view mode for playlists in the sidebar")
             }
 
             Section("Startup") {

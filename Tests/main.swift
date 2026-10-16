@@ -14,6 +14,7 @@ func main() async {
     await runTransferHistoryTests()
     await runZipRoundtripTests()
     await runPlaylistFilterTests()
+    await runLayoutPreferencesTests()
 
     let code = TestSuite.shared.report()
     exit(code)
