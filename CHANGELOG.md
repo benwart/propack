@@ -1,3 +1,17 @@
+## [1.1.0](https://github.com/benwart/propack/compare/v1.0.1...v1.1.0) (2026-10-16)
+
+### Features
+
+* add arrangement tracking, color-coded slide group badges, and visual tour ([fed07e3](https://github.com/benwart/propack/commit/fed07e3e046f1bf349402c9d7204cd74c4a7336e))
+* add playlist filtering, sorting, and search capabilities to the sidebar ([492b18c](https://github.com/benwart/propack/commit/492b18cfe4b951f03dea0223ab2132cf0888cdde))
+* **locator:** detect ProPresenter workspaces, Audience Look themes, and custom fonts ([022d114](https://github.com/benwart/propack/commit/022d1145507934708a5556e2855f0cbae763ff4f))
+* **transfer:** bundle and restore Audience Look themes and fonts in .propack archives ([86fb17a](https://github.com/benwart/propack/commit/86fb17a340ad05da88069434b096a48d2c3ed58c))
+* **ui:** add theme and font export toggles and import destination previews ([7bf2735](https://github.com/benwart/propack/commit/7bf27356dfdb7143e6f56215f30c1045e01f8f68))
+
+### Bug Fixes
+
+* **release:** downgrade conventional-changelog-conventionalcommits to v9 for semantic-release compatibility ([cf4e6e6](https://github.com/benwart/propack/commit/cf4e6e69a4040548e629406d5da45045ce9e3a3f))
+
 ## [1.0.1](https://github.com/benwart/propack/compare/v1.0.0...v1.0.1) (2026-10-12)
 
 ### Bug Fixes
