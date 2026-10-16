@@ -25,8 +25,16 @@
       "groupName": "semantic-release plugins",
       "automerge": false,
       "matchPackageNames": [
-        "/^@?semantic-release/"
+        "/^@?semantic-release/",
+        "conventional-changelog-conventionalcommits"
       ]
+    },
+    {
+      "description": "Restrict conventional-changelog-conventionalcommits to v9 for compatibility with @semantic-release/release-notes-generator",
+      "matchPackageNames": [
+        "conventional-changelog-conventionalcommits"
+      ],
+      "allowedVersions": "<10.0.0"
     },
     {
       "description": "Group documentation Python dependencies",
